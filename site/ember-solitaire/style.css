@@ -1,0 +1,19 @@
+:root { --bg: #090B0D; --panel: #15191D; --text: #F3EEE4; --dim: #B4AEA4; --gold: #F6A23A; --ember: #E36B28; --line: rgba(246,162,58,.28); color-scheme: dark; }
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.65 Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+main { max-width: 720px; margin: 0 auto; padding: 40px 20px 80px; }
+header { text-align: center; padding-bottom: 24px; border-bottom: 1px solid var(--line); margin-bottom: 32px; }
+header img { width: 96px; height: auto; }
+h1 { font-family: Cinzel, Georgia, serif; letter-spacing: .08em; font-weight: 600; color: #FFE6B3; margin: 8px 0 4px; font-size: clamp(26px, 6vw, 36px); text-wrap: balance; }
+h2 { font-family: Cinzel, Georgia, serif; letter-spacing: .05em; font-weight: 600; color: #FFE6B3; font-size: 20px; margin: 36px 0 8px; }
+.eyebrow { font-size: 12px; letter-spacing: .18em; text-transform: uppercase; color: var(--gold); font-weight: 600; }
+p, li { color: var(--text); max-width: 66ch; }
+.dim { color: var(--dim); }
+a { color: var(--gold); }
+table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 14px; }
+.wrap { overflow-x: auto; }
+th, td { text-align: left; padding: 10px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { color: var(--gold); font-weight: 600; font-size: 12px; letter-spacing: .08em; text-transform: uppercase; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px 18px; margin: 16px 0; }
+.btn { display: inline-block; padding: 12px 22px; border: 1px solid var(--gold); border-radius: 8px; text-decoration: none; color: #FFE6B3; letter-spacing: .1em; text-transform: uppercase; font-weight: 700; font-size: 13px; }
+footer { margin-top: 48px; padding-top: 16px; border-top: 1px solid var(--line); font-size: 13px; color: var(--dim); text-align: center; }

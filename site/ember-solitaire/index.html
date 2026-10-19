@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#090B0D">
+<meta name="description" content="Ember Solitaire — classic Spider Solitaire inside an ancient forge. A Horizon Forge game.">
+<title>Ember Solitaire</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="assets/branding/icon-192.png">
+<link rel="apple-touch-icon" href="assets/branding/icon-192.png">
+<link rel="preload" href="assets/fonts/cinzel-latin-600-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="assets/fonts/inter-latin-600-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="assets/branding/ember_spade.webp" as="image">
+<link rel="stylesheet" href="css/tokens.css">
+<link rel="stylesheet" href="css/base.css">
+<link rel="stylesheet" href="css/screens.css">
+<link rel="stylesheet" href="css/board.css">
+</head>
+<body>
+<div id="app" class="app">
+
+  <!-- SPLASH ---------------------------------------------------------------->
+  <section class="screen" id="scr-splash" data-env="splash" data-field="splash" aria-label="Ember Solitaire">
+    <div class="bg"></div><div class="smoke"></div>
+    <div class="fg splash">
+      <div class="splash-mark">
+        <div class="splash-glow"></div>
+        <img class="splash-emblem" src="assets/branding/ember_spade.webp" alt="" width="500" height="670">
+      </div>
+      <h1 class="splash-title"><span class="display xl ember-text">Ember</span><span class="display splash-sub">Solitaire</span></h1>
+      <div class="ornament"></div>
+      <p class="splash-tag caps">Every hand<br>feeds the flame</p>
+      <p class="splash-foot caps dim">A Horizon Forge Game</p>
+      <p class="splash-skip small muted" id="splashSkip" hidden>Tap to continue</p>
+    </div>
+  </section>
+
+  <!-- INTRO / FIRST-TIME ---------------------------------------------------->
+  <section class="screen" id="scr-intro" data-env="forgeChamber" data-field="forge" aria-label="Welcome to the forge">
+    <div class="bg"></div><div class="smoke"></div>
+    <div class="fg"><div class="intro" id="introRoot"></div></div>
+  </section>
+
+  <!-- HOME ------------------------------------------------------------------>
+  <section class="screen has-tabbar" id="scr-home" data-env="forgeHall" data-field="home" data-tab="home" aria-label="Home">
+    <div class="bg"></div><div class="smoke"></div><div class="smoke b"></div>
+    <div class="fg">
+      <header class="home-top">
+        <div class="level" id="homeLevel"></div>
+        <button class="icon-btn" id="homeSettings" aria-label="Settings" data-go="settings"></button>
+      </header>
+      <div class="home-title center" id="homeTitle"></div>
+      <div class="home-stage artifact-stage" id="homeStage"></div>
+      <div class="home-bottom content" id="homeBottom"></div>
+    </div>
+  </section>
+
+  <!-- PLAY / MODES ---------------------------------------------------------->
+  <section class="screen has-tabbar" id="scr-modes" data-env="forgeHall" data-field="none" data-tab="home" aria-label="Choose difficulty">
+    <div class="bg"></div>
+    <div class="fg scroll" id="modesRoot"></div>
+  </section>
+
+  <!-- GAME ------------------------------------------------------------------>
+  <section class="screen" id="scr-game" data-env="forgeHall" data-field="board" aria-label="Spider Solitaire">
+    <div class="bg"></div>
+    <div class="fg game">
+      <header class="game-top">
+        <button class="icon-btn" id="btnPause" aria-label="Pause"></button>
+        <div class="game-title"><div class="display">Spider</div><span class="caps" id="gMode">2 Suit</span></div>
+        <div class="gstats">
+          <div class="gstat"><span class="caps dim">Time</span><b id="gTime" class="num">00:00</b></div>
+          <div class="gstat"><span class="caps dim">Moves</span><b id="gMoves" class="num">0</b></div>
+        </div>
+      </header>
+      <div class="sets-row" id="gSets" role="img" aria-label="Completed sets 0 of 8"></div>
+      <div class="table" id="table">
+        <div class="board" id="board" tabindex="0" role="application" aria-label="Tableau. Arrow keys choose a column, Enter picks up or places cards, D deals, U undoes, H hints." aria-describedby="gLive"></div>
+      </div>
+      <button class="finish-btn" id="btnFinish" hidden><span class="i-finish"></span>Auto-complete</button>
+      <footer class="game-bottom">
+        <button class="tool" id="btnUndo" aria-label="Undo"><span class="i-undo"></span><span>Undo</span></button>
+        <button class="tool" id="btnHint" aria-label="Hint"><span class="i-hint"></span><span>Hint</span></button>
+        <button class="stock" id="btnStock" aria-label="Deal from stock">
+          <span class="stock-pile"><i></i><i></i><i></i><i></i><i></i></span>
+          <span class="stock-label"><span>Stock</span><span class="stock-count">5</span></span>
+        </button>
+      </footer>
+      <div class="sr-only" aria-live="polite" id="gLive"></div>
+    </div>
+  </section>
+
+  <!-- FORGE ----------------------------------------------------------------->
+  <section class="screen has-tabbar" id="scr-forge" data-env="forgeChamber" data-field="forge" data-tab="forge" aria-label="The Forge">
+    <div class="bg"></div><div class="smoke"></div><div class="smoke b"></div>
+    <div class="fg" id="forgeRoot"></div>
+  </section>
+
+  <!-- HALL OF LEGENDS ------------------------------------------------------->
+  <section class="screen has-tabbar" id="scr-hall" data-env="hall" data-field="hall" data-tab="collection" aria-label="Hall of Legends">
+    <div class="bg"></div><div class="smoke"></div>
+    <div class="fg" id="hallRoot"></div>
+  </section>
+
+  <!-- COLLECTION ------------------------------------------------------------>
+  <section class="screen has-tabbar" id="scr-collection" data-env="hall" data-field="none" data-tab="collection" aria-label="Artifact collection">
+    <div class="bg"></div>
+    <div class="fg scroll" id="collectionRoot"></div>
+  </section>
+
+  <!-- DAILY ----------------------------------------------------------------->
+  <section class="screen has-tabbar" id="scr-daily" data-env="forgeChamber" data-field="none" data-tab="daily" aria-label="Daily challenge">
+    <div class="bg"></div>
+    <div class="fg scroll" id="dailyRoot"></div>
+  </section>
+
+  <!-- PROFILE / STATISTICS -------------------------------------------------->
+  <section class="screen has-tabbar" id="scr-profile" data-env="forgeHall" data-field="none" data-tab="profile" aria-label="Forge record">
+    <div class="bg"></div>
+    <div class="fg scroll" id="profileRoot"></div>
+  </section>
+
+  <!-- SETTINGS -------------------------------------------------------------->
+  <section class="screen has-tabbar" id="scr-settings" data-env="forgeHall" data-field="none" data-tab="profile" aria-label="Settings">
+    <div class="bg"></div>
+    <div class="fg scroll" id="settingsRoot"></div>
+  </section>
+
+  <nav class="tabbar is-hidden" id="tabbar" aria-label="Main">
+    <div class="tabbar-inner">
+      <button class="tab" data-tab="home" data-go="home"><span data-icon="play"></span><span>Play</span></button>
+      <button class="tab" data-tab="forge" data-go="forge"><span data-icon="forge"></span><span>Forge</span></button>
+      <button class="tab" data-tab="daily" data-go="daily"><span data-icon="challenges"></span><span>Challenges</span></button>
+      <button class="tab" data-tab="collection" data-go="collection"><span data-icon="collection"></span><span>Collection</span></button>
+      <button class="tab" data-tab="profile" data-go="profile"><span data-icon="profile"></span><span>Profile</span></button>
+    </div>
+  </nav>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+</div>
+
+<noscript><p style="color:#F3EEE4;font-family:sans-serif;padding:24px">Ember Solitaire needs JavaScript to run.</p></noscript>
+
+<!-- engine (pure rules) -->
+<script src="js/engine.js"></script>
+<!-- release config + native bridge -->
+<script src="js/build-config.js" onerror="void 0"></script>
+<script src="js/config.js"></script>
+<script src="js/platform.js"></script>
+<script src="js/analytics.js"></script>
+<!-- data + services -->
+<script src="js/manifest.js"></script>
+<script src="js/artifacts.js"></script>
+<script src="js/store.js"></script>
+<script src="js/icons.js"></script>
+<script src="js/audio.js"></script>
+<script src="js/fx.js"></script>
+<script src="js/ads.js"></script>
+<!-- presentation -->
+<script src="js/board.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/screens.js"></script>
+<script src="js/ceremony.js"></script>
+<script src="js/tutorial.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

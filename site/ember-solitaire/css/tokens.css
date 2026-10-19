@@ -1,0 +1,96 @@
+/* ==========================================================================
+   EMBER SOLITAIRE — Design tokens
+   ========================================================================== */
+@font-face { font-family: 'Cinzel'; font-weight: 500; font-display: swap; src: url('../assets/fonts/cinzel-latin-500-normal.woff2') format('woff2'); }
+@font-face { font-family: 'Cinzel'; font-weight: 600; font-display: swap; src: url('../assets/fonts/cinzel-latin-600-normal.woff2') format('woff2'); }
+@font-face { font-family: 'Cinzel'; font-weight: 700; font-display: swap; src: url('../assets/fonts/cinzel-latin-700-normal.woff2') format('woff2'); }
+@font-face { font-family: 'Inter'; font-weight: 400; font-display: swap; src: url('../assets/fonts/inter-latin-400-normal.woff2') format('woff2'); }
+@font-face { font-family: 'Inter'; font-weight: 500; font-display: swap; src: url('../assets/fonts/inter-latin-500-normal.woff2') format('woff2'); }
+@font-face { font-family: 'Inter'; font-weight: 600; font-display: swap; src: url('../assets/fonts/inter-latin-600-normal.woff2') format('woff2'); }
+@font-face { font-family: 'Inter'; font-weight: 700; font-display: swap; src: url('../assets/fonts/inter-latin-700-normal.woff2') format('woff2'); }
+
+:root {
+  /* core palette */
+  --forge-black: #090B0D;
+  --charcoal-iron: #15191D;
+  --forged-steel: #343A40;
+  --warm-ivory: #F3EEE4;
+  --ash: #AAA59C;
+  --ember: #E36B28;
+  --molten-gold: #F6A23A;
+  --white-heat: #FFE6B3;
+  --deep-red: #B9342C;
+
+  /* derived */
+  --iron-900: #0c0e10;
+  --iron-800: #111417;
+  --iron-700: #1b1f23;
+  --iron-600: #23282d;
+  --bronze-300: #d9a15d;
+  --bronze-500: #a8743f;
+  --bronze-700: #5d4128;
+  --bronze-900: #33241a;
+  --line: rgba(246, 162, 58, .26);
+  --line-soft: rgba(246, 162, 58, .14);
+  --line-strong: rgba(246, 162, 58, .55);
+  --text: var(--warm-ivory);
+  --text-dim: var(--ash);
+  --text-faint: #8f897f;          /* 5.1:1 on panels (WCAG AA) */
+  --card-ivory: #f4ecdc;
+  --card-ink: #17130f;
+  --card-red: #a8261d;
+
+  /* type */
+  --font-display: 'Cinzel', 'Trajan Pro', Georgia, 'Times New Roman', serif;
+  --font-ui: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --fs-2xs: 10px; --fs-xs: 11px; --fs-sm: 13px; --fs-md: 15px; --fs-lg: 17px;
+  --fs-title: clamp(26px, 7.4vw, 36px);
+  --fs-hero: clamp(40px, 12vw, 64px);
+  --track-display: .08em;
+  --track-caps: .16em;
+
+  /* space / shape */
+  --s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px; --s5: 20px; --s6: 24px; --s8: 32px; --s10: 40px;
+  --gutter: 16px;
+  --r-sm: 6px; --r-md: 10px; --r-lg: 14px;
+  --chamfer: 9px;
+  --tap: 44px;
+  --content-max: 520px;
+  /* Capacitor 8 injects --safe-area-inset-* on Android (edge-to-edge); browsers use env() */
+  --safe-top: var(--safe-area-inset-top, env(safe-area-inset-top, 0px));
+  --safe-bottom: var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px));
+  --safe-left: var(--safe-area-inset-left, env(safe-area-inset-left, 0px));
+  --safe-right: var(--safe-area-inset-right, env(safe-area-inset-right, 0px));
+  --tabbar-h: 68px;
+
+  /* depth / light */
+  --shadow-1: 0 2px 6px rgba(0,0,0,.45);
+  --shadow-2: 0 10px 30px rgba(0,0,0,.55);
+  --shadow-lift: 0 16px 28px rgba(0,0,0,.55), 0 4px 10px rgba(0,0,0,.4);
+  --glow-ember: 0 0 0 1px rgba(227,107,40,.55), 0 0 18px rgba(227,107,40,.45);
+  --glow-soft: 0 0 24px rgba(227,107,40,.28);
+  --molten: linear-gradient(90deg, #5a1a08 0%, #b8400f 28%, #e36b28 55%, #f6a23a 82%, #ffe6b3 100%);
+
+  /* motion */
+  --ease-card: cubic-bezier(.2, .75, .25, 1);
+  --ease-out: cubic-bezier(.16, .84, .3, 1);
+  --ease-inout: cubic-bezier(.65, 0, .35, 1);
+  --dur-fast: 140ms;
+  --dur-ui: 220ms;
+  --dur-card: 260ms;
+  --dur-screen: 320ms;
+  --px: 0; --py: 0;
+}
+
+/* High contrast: brighter text, opaque surfaces, stronger outlines */
+:root[data-contrast="1"] {
+  --text: #ffffff;
+  --text-dim: #e4ddd2;
+  --text-faint: #c9c1b5;
+  --line: rgba(255, 196, 120, .6);
+  --line-soft: rgba(255, 196, 120, .38);
+  --card-ink: #000;
+  --card-red: #c01a10;
+}
+:root[data-reduced="1"] { --dur-fast: 1ms; --dur-ui: 1ms; --dur-card: 1ms; --dur-screen: 1ms; }
+@media (prefers-reduced-motion: reduce) { :root { --dur-fast: 1ms; --dur-ui: 1ms; --dur-card: 1ms; --dur-screen: 1ms; } }

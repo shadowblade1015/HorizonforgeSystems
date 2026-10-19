@@ -1,37 +1,31 @@
-# Horizon Forge Systems
+﻿# Horizon Forge Systems
 
-Complete Horizon Forge portfolio website and playable Ember Solitaire web beta.
+Portfolio website and playable Ember Solitaire web beta. Node 24 is the tested baseline; no package installation or runtime dependencies are required.
 
-## Deploy on Vercel
+## Source and local development
 
-Import this repository. Use Framework Preset **Other**, Build Command
-**node build.mjs**, Output Directory **dist**, and leave Install Command empty.
-The included vercel.json supplies these settings. No packages, database or
-API keys are needed. The build script uses only built-in Node.js modules.
+- `site/`: authoritative HTML, CSS, JavaScript, artwork, fonts and game assets. Edit files here, preserving public relative paths.
+- `dist/`: generated deployment output, ignored by Git. Builds replace it; do not edit it.
+- `build.mjs`: script-relative staging, validation and output replacement.
+- `tests/`, `tools/`, `docs/`: regression fixtures, verification and audit/history.
+- `site-source.tar.gz`: preserved historical 143-file baseline, no longer the editable source.
 
-## Source files
+Run from the repository root:
 
-`site-source.tar.gz` contains the complete editable HTML, CSS, JavaScript and
-images under `dist/`, including `/ember-solitaire/` and its privacy page.
-The archive preserves the nested asset layout during browser upload.
-Run `node build.mjs` locally to extract all source files.
-
-To update: extract, edit dist, then replace the archive with the modified dist
-folder packaged as USTAR tar.gz. On Windows, Python can create this archive:
-
-```python
-import tarfile
-with tarfile.open('site-source.tar.gz', 'w:gz', format=tarfile.USTAR_FORMAT) as t:
-    t.add('dist', arcname='dist')
+```powershell
+node build.mjs
+node tools/verify-source.mjs
+node --test tests/*.test.mjs
 ```
 
-Alternatively commit the extracted dist folder, remove buildCommand from
-vercel.json (or set it to an empty string), and maintain the static files directly.
-For game updates, revise the cache VERSION in dist/ember-solitaire/sw.js.
+Build and verification resolve project paths relative to their scripts. Tests load application modules from `site/`. See [testing and rollback](docs/TESTING.md) for validation scope and four documented defect TODOs.
 
-Ads remain disabled. Contact inquiries use the visitor's email app.
-Game saves are browser-local. This repository does not include the private
-access restrictions of the original ChatGPT Sites deployment.
+## Vercel
 
-Before switching horizonforgesystems.com, test the Vercel preview URL, gameplay,
-privacy page and contact flow. Browser gameplay testing remains outstanding.
+Import the repository using Framework Preset **Other**, Build Command **node build.mjs**, Output Directory **dist**, and an empty Install Command. Existing `vercel.json` remains unchanged, including routes and headers. Include `site/`, tools, tests, docs and configuration in the eventual reviewed commit. No deployment was performed during migration.
+
+## Rollback
+
+Each successful rebuild retains the preceding output in `.dist-backup-*`. The migration also preserves original output, archive and build script in `.phase2-backup/`. These are local ignored recovery copies, not part of a clean checkout. Preserve them until review is complete.
+
+To roll back source, restore the desired reviewed `site/` revision and rebuild. To return to the historical archive, follow the archive recovery procedure in [docs/TESTING.md](docs/TESTING.md). Do not overwrite edited source or clear player storage. Ads remain disabled; saves use the unchanged browser-local `ember.save.v2` format.

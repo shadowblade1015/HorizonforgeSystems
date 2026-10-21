@@ -1,4 +1,4 @@
-# Phase 2 testing, source ownership and recovery
+# Testing, source ownership and recovery
 
 October 18, 2026. Node 24 is the tested baseline. Built-in Node modules only; no install step.
 
@@ -59,7 +59,7 @@ Phase 2: 143 source/output files match the historical baseline (8,496,965 bytes)
 
 ## Engine and persistence fixtures
 
-`tests/helpers.mjs` creates a fresh VM per scenario, loads the unchanged production modules, fixes Date.now and supplies private in-memory localStorage. Debounced timers are inert; persistence tests explicitly call save(true). This does not test real timer scheduling, storage exceptions or lifecycle flushes.
+`tests/helpers.mjs` creates a fresh VM per scenario, loads the tracked production modules, fixes Date.now and supplies private in-memory localStorage. Debounced timers are inert; persistence tests explicitly call save(true). Storage exceptions are covered by Phase 3A tests. This does not test real timer scheduling or browser lifecycle flush delivery.
 
 `tests/engine.test.mjs` covers 1/2/4-suit deck composition, unique IDs, initial visibility, deterministic seeds, legal and illegal moves, reveal/undo, gap and exhausted-stock rejection, deal order, stock restoration, history independence/cap, completed sequences and set high-water behavior. Seeded legal-play loops check live IDs plus completed-card accounting after each action and undo. Synthetic sequence fixtures isolate settlement; they do not represent a full browser victory.
 
@@ -67,16 +67,16 @@ Phase 2: 143 source/output files match the historical baseline (8,496,965 bytes)
 
 ## Known defects: intended behavior fails
 
-`tests/regressions.test.mjs` executes four TODO tests, each asserting the desired behavior. Do not invert assertions to accept defects.
+`tests/regressions.test.mjs` now runs the F01 assertion as a passing regression and retains three TODO tests asserting desired behavior. See [Phase 3A report](PHASE_3A_REPORT.md). Do not invert assertions to accept defects.
 
 | Finding | Intended result | Current reproduction |
 | --- | --- | --- |
 | F02 | One victory / 85 Ember after win, undo, replay | Two victories / 160 Ember; set reward remains high-water protected |
-| F01 | Reject malformed active hand while preserving 321 Ember | `{cols:[]}` accepted as game |
+| F01 (fixed in Phase 3A) | Reject malformed active hand while preserving 321 Ember | Passes; raw original retained and replacement requires recovery confirmation |
 | F14 | Reject lift containing face-down second card | Run accepted |
 | F14 | Do not remove K-A sequence with face-down Ace | Sequence removed |
 
-Remove TODOs when fixes land in later phases, then require these assertions to pass. No production fix belongs to Phase 1.
+Remove remaining TODOs only when their fixes land, then require those assertions to pass. Phase 1 and Phase 2 execution records above remain historical.
 
 
 ## Browser functionality not tested
@@ -91,4 +91,11 @@ No browser tests were run in Phase 1. Before a later release, use a separate loc
 - Quota/denied storage, malformed/future saves, multi-tab conflicts and lifecycle save timing.
 - Real Vercel routing, redirects, headers, CDN behavior, responsiveness/performance and native adapters.
 
-These remain outstanding manual checks. Phase 2 changes only source ownership and build tooling.
+These remain outstanding manual checks. Phase 2 changed source ownership/build tooling; Phase 3A adds save integrity/recovery. See the Phase 3A report for its specific browser checklist.
+## Phase 3A persistence validation
+
+Run the same build, verifier and full test commands above. Final Phase 3A suite: **78 tests, 75 pass, zero unexpected failures, three known failing TODOs**. Source/output parity remains 143 files; 138 retain historical archive bytes and five intentionally change. No historical inventory was rewritten.
+
+New persistence tests inject read/write/quota failures and unavailable storage, validate save/hand/history boundaries, preserve valid v2 progress, exercise explicit recovery/import/reset backups and compare input fixture bytes before/after. Minimal DOM tests check event wiring/download data and confirmation boundaries; they do not certify browser layout or real downloads. The helper's inert timers still do not test actual debounce scheduling or lifecycle event delivery.
+
+For recovery, use **Settings ? Save Recovery** or the persistent warning. Export the original before accepting a recovered profile; use the validated import preview to restore an exported v2 copy. Unsupported versions cannot overwrite themselves through autosave/reset. Local backups and quarantine keys are retained; no stored data is cleared automatically. Read-denied sessions stay protected until access is restored and the page can be safely reloaded after exporting memory. Full behavior, key names, results and remaining risks are in [PHASE_3A_REPORT.md](PHASE_3A_REPORT.md).

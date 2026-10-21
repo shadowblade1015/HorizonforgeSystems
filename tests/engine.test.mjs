@@ -116,7 +116,9 @@ test('v2 profile fixture loads and preserves progress through save/load without 
 });
 
 test('save retains latest 20 history entries without trimming in-memory history', () => {
-  const { E, S, storage } = harness(); S.load(); const g = position(E); g.cols[0] = [card('a', 5)];
+  const { E, S, storage } = harness(); S.load(); const g = E.newGame(1, { seed: 42 });
+  const cards = g.cols.flat(); cards.forEach(c => { c.up = true; });
+  g.cols = [[cards.shift()], [], cards, [], [], [], [], [], [], []];
   for (let i = 0; i < 30; i++) E.move(g, i % 2, 0, 1 - i % 2);
   S.startGame(g); assert.equal(g.history.length, 30);
   assert.equal(JSON.parse(storage.get(S.KEY)).game.history.length, 20);

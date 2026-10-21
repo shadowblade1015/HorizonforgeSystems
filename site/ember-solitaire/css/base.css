@@ -210,3 +210,8 @@ img, svg { display: block; }
 .tier-legendary .artifact-svg { filter: drop-shadow(0 0 16px rgba(255,150,60,.55)) drop-shadow(0 18px 18px rgba(0,0,0,.65)); }
 
 @media (prefers-reduced-motion: reduce) { .artifact-svg .art-hot, .molten > .fill::after, .cta.is-ready { animation: none; } }
+
+/* Persistent storage warnings remain available on every game screen. */
+.save-status { position: fixed; z-index: 55; top: max(8px, env(safe-area-inset-top)); left: 50%; transform: translateX(-50%); width: min(94vw, 620px); padding: 10px; display: flex; align-items: center; gap: 10px; background: #211a16; color: #f3eee4; border: 1px solid #dfab66; border-radius: 10px; font-size: 12px; box-shadow: 0 4px 20px #0008; }
+.save-status[hidden] { display: none; }
+.save-status .btn { flex-shrink: 0; font-size: 12px; padding: 8px; }

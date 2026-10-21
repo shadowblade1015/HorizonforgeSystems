@@ -1,0 +1,734 @@
+{
+  "sourceHashes": {
+    "build.mjs": "40b749676a4a9dfa7831c7223091fa4529796b88ee7369c88b28a6c66fe3ac93",
+    "vercel.json": "0712500faa9ca46bbc3f596ef7e14f2645607ff934e05ec536be29bd765fb81d"
+  },
+  "archiveSha256": "e6c378cab4ef0d92b122ec4f725a2a728bb1001e002b022755e1743e53f84291",
+  "inventorySha256": "25a0557ec2c8b7487849887324ba1358a9a8272bcb6f3b49a41dd07e43364ae2",
+  "matching": 143,
+  "archiveFiles": 143,
+  "extractedFiles": 143,
+  "syntax": 23,
+  "json": 2,
+  "references": 421,
+  "precache": 131,
+  "routes": 9,
+  "errors": [],
+  "inventory": [
+    {
+      "path": "dist/about/index.html",
+      "bytes": 4630,
+      "sha256": "103a03ed34171a86d377583f4252d1c92c107f94bba0c68bbb13d6a70136124a"
+    },
+    {
+      "path": "dist/afarringtale-productions.png",
+      "bytes": 654054,
+      "sha256": "390ee186a0e5840fe820796417695577274f3ac8096edf5e2df6acb6bad37406"
+    },
+    {
+      "path": "dist/app.js",
+      "bytes": 4500,
+      "sha256": "5078b3db0abf1d7af30e9edd55cdacbaa63c5613070e60f47ef9e38a3c10898e"
+    },
+    {
+      "path": "dist/contact/index.html",
+      "bytes": 5442,
+      "sha256": "342ffdb70e514bd5cec64c0da9e5b2c07c666bed89754513634c693ae8f030bd"
+    },
+    {
+      "path": "dist/ember-solitaire/assets/branding/ember_spade_sm.webp",
+      "bytes": 43242,
+      "sha256": "76595aa9f59582a7a25c757db0bed964178eeb420f4c1d2cb59feb99996447ec"
+    },
+    {
+      "path": "dist/ember-solitaire/assets/branding/ember_spade.webp",
+      "bytes": 126962,
+      "sha256": "14bb542b55221845ff68a0f97db78a067c2cad09db33077251bdc911c04143cd"
+    },
+    {
+      "path": "dist/ember-solitaire/assets/branding/icon-192.png",
+      "bytes": 36999,
+      "sha256": "21abe550bbba469930868716050d0a87df80e734b8ba806feb8a5bf38059e034"
+    },
+    {
+      "path": "dist/ember-solitaire/assets/branding/icon-512.png",
+      "bytes": 228580,
+      "sha256": "9ce8de05fc45cecaf9c3c033cd61c84ff14c4384e5bec5872484e9c071994d2c"
+    },
+    {
+      "path": "dist/ember-solitaire/assets/cards/backs/club.webp",
+      "bytes": 51204,
+      "sha256": "249362e0ccdc145ee8e071433a4b452fdedfb66eec1bb8adb0815fc8c24be389"
+    },
+    {
+      "path": "dist/ember-solitaire/assets/cards/backs/club@2x.webp",
+      "bytes": 167070,
+      "sha256": "c46f0e4fd4bf0014f2dd6821b73bbb4b0db49156e21e346e0b9d12e30f2f6154"
+    },
+    {
+      "path": "dist/ember-solitaire/assets/cards/backs/diamond.webp",
+      "bytes": 46518,
+      "sha256": "357d40fdc9d9e33833dd5559d07b357e749a369cd2d074b0ac3d292fd5008e3e"
+    },
+    {
+      "path": "dist/ember-solitaire/assets/cards/backs/diamond@2x.webp",
+      "bytes": 130894,
+      "sha256": "8632d1e96b77f3d3ced8559cd4e5bd6445f9744eed6dd826eb4d899a486623a3"
+    },
+    {
+      "path": "dist/ember-solitaire/assets/cards/backs/heart.webp",
+      "bytes": 48194,
+      "sha256": "2801a699fff5100103e9fb927d284c4b66deb321691c4c65594597d48fe14167"
+    },
+    {
+      "path": "dist/ember-solitaire/assets/cards/backs/heart@2x.webp",
+      "bytes": 155592,
+      "sha256": "906c42b7f93fd769c66879e97e17e473067d4b471c64e30578a816c21d3518a5"
+    },
+    {
+      "path": "dist/ember-solitaire/assets/cards/backs/spade.webp",
+      "bytes": 40298,
+      "sha256": "d5c8fd2d03044e9a87146e17de9e552dd82e1a4004bb809e7ac9f9c67334659a"
+    },
+    {
+      "path": "dist/ember-solitaire/assets/cards/backs/spade@2x.webp",
+      "bytes": 133360,
+      "sha256": "84fcdda9efd7dd834bbd089a0960199a7dc9ba06b735fadc9efec2fbf9143b2c"
+    },
+    {
+      "path": "dist/ember-solitaire/assets/cards/clubs/02.webp",
+      "bytes": 15776,
+      "sha256": "0acf171102fc0d6e0c38043b384dc3c2edd12c045f54d4ae1da7b251a212a92c"
+    },
+    {
+      "path": "dist/ember-solitaire/assets/cards/clubs/03.webp",
+      "bytes": 15268,
+      "sha256": "be638859b9733729ad2bd8d563b171bcac3ba5dfa754f3cdc2155d5c9765c771"
+    },
+    {
+      "path": "dist/ember-solitaire/assets/cards/clubs/04.webp",
+      "bytes": 17494,
+      "sha256": "38ddd30b38acab17ba7566be5184bf9cb9d66bf4633dc931019839441eabb517"
+    },
+    {
+      "path": "dist/ember-solitaire/assets/cards/clubs/05.webp",
+      "bytes": 17722,
+      "sha256": "718c891a42074caf18c0925e2fc4544c57d73e29dfcff78076a9d8a414b448a8"
+    },
+    {
+      "path": "dist/ember-solitaire/assets/cards/clubs/06.webp",
+      "bytes": 19958,
+      "sha256": "d482924c9af9285d01bd6fc9da55a97d25163cb7ae5d9106f7ebd3e8bc050ed5"
+    },
+    {
+      "path": "dist/ember-solitaire/assets/cards/clubs/07.webp",
+      "bytes": 20166,
+      "sha256": "c4bbfa7281f9dedee75399cf6a5b2528441825610abba9ff29c45fa0e3116635"
+    },
+    {
+      "path": "dist/ember-solitaire/assets/cards/clubs/08.webp",
+      "bytes": 22310,
+      "sha256": "34d17c9a929c702442b29644baf1767a45699739c6b9ca0d31b3b6b8b99a4223"
+    },
+    {
+      "path": "dist/ember-solitaire/assets/cards/clubs/09.webp",
+      "bytes": 22370,
+      "sha256": "57e6aa3bc3625908d7425a5a1dd94876cce602a7cd0102b534c6f2e6ad350a44"
+    },
+    {
+      "path": "dist/ember-solitaire/assets/cards/clubs/10.webp",
+      "bytes": 23116,
+      "sha256": "37c602fcf13d036ff9b6debf1dc95e0014da11bcd3eaa54d4cef28775484a303"
+    },
+    {
+      "path": "dist/ember-solitaire/assets/cards/clubs/ace.webp",
+      "bytes": 16712,
+      "sha256": "a43e16f5446f953b5e97922811236a1559f8a25b2c47cb2b773c8ba27116194e"
+    },
+    {
+      "path": "dist/ember-solitaire/assets/cards/clubs/ace@2x.webp",
+      "bytes": 51784,
+      "sha256": "b010c4119bf52aab796199c01f328bc59521b9af62cb7a8710525a2a8190c5ff"
+    },
+    {
+      "path": "dist/ember-solitaire/assets/cards/clubs/jack.webp",
+      "bytes": 41030,
+      "sha256": "6f3a065c10e9594bc6cd39722d4027c66eef903ed8b1b3162e364ecd697a659e"
+    },
+    {
+      "path": "dist/ember-solitaire/assets/cards/clubs/jack@2x.webp",
+      "bytes": 127286,
+      "sha256": "a47c2fb33b9bb3c9cf8ae9a46f097cc0fb3c929eb7fab10ccf2b8d5d9736eba0"
+    },
+    {
+      "path": "dist/ember-solitaire/assets/cards/clubs/king.webp",
+      "bytes": 39748,
+      "sha256": "3cde9bcd805fa3eeb444a91e4096d64ce7dc280d3fda8cda3fcf51b16edde750"
+    },
+    {
+      "path": "dist/ember-solitaire/assets/cards/clubs/king@2x.webp",
+      "bytes": 123596,
+      "sha256": "ef6f2e266e79e3812c29adf583d4be0d4c89e7fa53312d00d763e30cb9851fb3"
+    },
+    {
+      "path": "dist/ember-solitaire/assets/cards/clubs/queen.webp",
+      "bytes": 38704,
+      "sha256": "13fca29fc961c666a68cd2ab12a861e4ed3604c139510b8e6663d29bec783e90"
+    },
+    {
+      "path": "dist/ember-solitaire/assets/cards/clubs/queen@2x.webp",
+      "bytes": 119932,
+      "sha256": "176809d138707eca27a32c6a714f385cd2f4d7c6c8e921daf4c8298c3e8117bb"
+    },
+    {
+      "path": "dist/ember-solitaire/assets/cards/diamonds/02.webp",
+      "bytes": 12066,
+      "sha256": "e1f1025ede5b0c15861698643c3bedf60f874550c1a9e9a31fe3754ba04a8436"
+    },
+    {
+      "path": "dist/ember-solitaire/assets/cards/diamonds/03.webp",
+      "bytes": 13832,
+      "sha256": "f24baf7a1bb5d1344dc43ca741f9b2271fcc3d9d740a477207e1d0db7592b552"
+    },
+    {
+      "path": "dist/ember-solitaire/assets/cards/diamonds/04.webp",
+      "bytes": 14480,
+      "sha256": "f5b222abbf2c0c32239434a7bb8e525271602564eeb0e2d938233b8d19b6a18b"
+    },
+    {
+      "path": "dist/ember-solitaire/assets/cards/diamonds/05.webp",
+      "bytes": 15936,
+      "sha256": "eabd69d21976a6ca03d1b58bc5c534837fa98062ecff628cc20553095dfd27fc"
+    },
+    {
+      "path": "dist/ember-solitaire/assets/cards/diamonds/06.webp",
+      "bytes": 16146,
+      "sha256": "75788afdd1db16b6f8da96da9b2e28aff48dcdd0fba508e60e9e0a3d72553b59"
+    },
+    {
+      "path": "dist/ember-solitaire/assets/cards/diamonds/07.webp",
+      "bytes": 16228,
+      "sha256": "9a81dac148a42ea80d704d15adaa7a815685b1633feb255c00363e91bf328dd5"
+    },
+    {
+      "path": "dist/ember-solitaire/assets/cards/diamonds/08.webp",
+      "bytes": 16596,
+      "sha256": "10205541975714ed500a80bef10ed5c8e94265b70c45ea926236a484fb3ab93a"
+    },
+    {
+      "path": "dist/ember-solitaire/assets/cards/diamonds/09.webp",
+      "bytes": 17960,
+      "sha256": "786c51391779e635b6a0435f18ecaf542fcabf79a77d82188b32b0ac66584e04"
+    },
+    {
+      "path": "dist/ember-solitaire/assets/cards/diamonds/10.webp",
+      "bytes": 18756,
+      "sha256": "2e24a06ad667e4d17bc3d2473607621ddfc328d8666fe0a50748c88359398c97"
+    },
+    {
+      "path": "dist/ember-solitaire/assets/cards/diamonds/ace.webp",
+      "bytes": 15276,
+      "sha256": "58d02094ffd72863afefb2f6456540cf4e4b8c9e827c26a8b44321ae26172ef2"
+    },
+    {
+      "path": "dist/ember-solitaire/assets/cards/diamonds/ace@2x.webp",
+      "bytes": 46774,
+      "sha256": "222bd86088f9b40e6831182cf8ca86065635a8fce5ef89ad73561cef7627a46b"
+    },
+    {
+      "path": "dist/ember-solitaire/assets/cards/diamonds/jack.webp",
+      "bytes": 38900,
+      "sha256": "5d6c3221e61599121fec0106b83ff51ce36a34b4ed632ad2a8fef5a44ff44066"
+    },
+    {
+      "path": "dist/ember-solitaire/assets/cards/diamonds/jack@2x.webp",
+      "bytes": 113672,
+      "sha256": "cdc657b5411ba549bae69b0622a924ab575144f7d4d4830c62f09e9bc05eb899"
+    },
+    {
+      "path": "dist/ember-solitaire/assets/cards/diamonds/king.webp",
+      "bytes": 40800,
+      "sha256": "a8cc8b9881fe7437faa8ea29ffa4286ade249de8babd743ebb720ff9ba146007"
+    },
+    {
+      "path": "dist/ember-solitaire/assets/cards/diamonds/king@2x.webp",
+      "bytes": 125616,
+      "sha256": "616d9b28a5ef5e394732a411a73545456de1751eef836edffff363cd898283d0"
+    },
+    {
+      "path": "dist/ember-solitaire/assets/cards/diamonds/queen.webp",
+      "bytes": 37904,
+      "sha256": "7577652e47ed090ef55f0739a84fc78fa9ec2b65027109c6b5bcd44941eec9bc"
+    },
+    {
+      "path": "dist/ember-solitaire/assets/cards/diamonds/queen@2x.webp",
+      "bytes": 110056,
+      "sha256": "90a380b3295e62efdee8062825d2e563a63144bb132aaa460f5784294037bda8"
+    },
+    {
+      "path": "dist/ember-solitaire/assets/cards/hearts/02.webp",
+      "bytes": 14984,
+      "sha256": "23cc2f8d63cf249cfa9e586c5c02fea725781f8902cf26b3e83532b7cc290c51"
+    },
+    {
+      "path": "dist/ember-solitaire/assets/cards/hearts/03.webp",
+      "bytes": 13356,
+      "sha256": "99b436c0484e678605460f7fd9f00d5271afaa593ea3a77755398dc9799aa471"
+    },
+    {
+      "path": "dist/ember-solitaire/assets/cards/hearts/04.webp",
+      "bytes": 19172,
+      "sha256": "b67da90147f2e066dc4f6e2db3f22bff3f1c68876682247f9856e21c645160dc"
+    },
+    {
+      "path": "dist/ember-solitaire/assets/cards/hearts/05.webp",
+      "bytes": 12026,
+      "sha256": "9011dee54f4cfa8106f7dbe46764f7ca80eac5d0d7dfd58c84e6678e2f3a4881"
+    },
+    {
+      "path": "dist/ember-solitaire/assets/cards/hearts/06.webp",
+      "bytes": 16668,
+      "sha256": "c03af4f8161d0193559dd30a1eb6c2cad0a4715a74166de37b4c95a5551af11b"
+    },
+    {
+      "path": "dist/ember-solitaire/assets/cards/hearts/07.webp",
+      "bytes": 16370,
+      "sha256": "be922d21702709be40d4eaa144cca957b7841ad57d86613cdb7b11d1c05d2f1a"
+    },
+    {
+      "path": "dist/ember-solitaire/assets/cards/hearts/08.webp",
+      "bytes": 16838,
+      "sha256": "3b0b8de502c62a9ef7ceba76aa6e746d7a3311ffb19ac0c78c54e1ac5d14a6e5"
+    },
+    {
+      "path": "dist/ember-solitaire/assets/cards/hearts/09.webp",
+      "bytes": 17504,
+      "sha256": "d84c9be4b242a9435ed38ba40c4560e90d7767a595efa8d605ec8e7cf02c16e2"
+    },
+    {
+      "path": "dist/ember-solitaire/assets/cards/hearts/10.webp",
+      "bytes": 15076,
+      "sha256": "9b94e59b972152a825a6b1c0c4afd222507c1bf159747654908cf88ab1cae052"
+    },
+    {
+      "path": "dist/ember-solitaire/assets/cards/hearts/ace.webp",
+      "bytes": 14006,
+      "sha256": "5a1eebf03aca478468cc9fbb9cd701fc5410cdea1d284a84f915237d3e222431"
+    },
+    {
+      "path": "dist/ember-solitaire/assets/cards/hearts/ace@2x.webp",
+      "bytes": 44274,
+      "sha256": "8ab40a91d2c8b53310980c8a28462dab883dfa693dcf123d2ffa3338e4eee64a"
+    },
+    {
+      "path": "dist/ember-solitaire/assets/cards/hearts/jack.webp",
+      "bytes": 40324,
+      "sha256": "58c52a0e2ebf7bbc5545919f7bc32645d8bbd2e74daa3e77c5ebccd86baf9de3"
+    },
+    {
+      "path": "dist/ember-solitaire/assets/cards/hearts/jack@2x.webp",
+      "bytes": 122636,
+      "sha256": "28b44da820e771668daa97ceb04aa3c355c7b480c19338620261faf54a4e1d1a"
+    },
+    {
+      "path": "dist/ember-solitaire/assets/cards/hearts/king.webp",
+      "bytes": 41640,
+      "sha256": "e04177f081ebf5f63779680402d6560e882a408a7746246e298257a21e7f8ce6"
+    },
+    {
+      "path": "dist/ember-solitaire/assets/cards/hearts/king@2x.webp",
+      "bytes": 128946,
+      "sha256": "1fa9c7eac97e3ea50694e0c1a9beff28763cb261e3fca11ecd8751a2ec6707b9"
+    },
+    {
+      "path": "dist/ember-solitaire/assets/cards/hearts/queen.webp",
+      "bytes": 40956,
+      "sha256": "5302378df497cf65d52f8388653d98682f79e75f3847bd2e5c6db9aed054d5e6"
+    },
+    {
+      "path": "dist/ember-solitaire/assets/cards/hearts/queen@2x.webp",
+      "bytes": 120158,
+      "sha256": "6f44f81579e0792465d09bd097ff8b7b72a427741ce189dc9c6426add157a01e"
+    },
+    {
+      "path": "dist/ember-solitaire/assets/cards/spades/02.webp",
+      "bytes": 9982,
+      "sha256": "997917ad9ccc459542d71f1a4e985b3d158cc46fb8997bf875b2b2630b1047f5"
+    },
+    {
+      "path": "dist/ember-solitaire/assets/cards/spades/03.webp",
+      "bytes": 10614,
+      "sha256": "4b60a78d2c2353b2b1845352ee1f5feb460d8d8ebfc1bc3ca8f47d8528d82673"
+    },
+    {
+      "path": "dist/ember-solitaire/assets/cards/spades/04.webp",
+      "bytes": 11842,
+      "sha256": "142beed966542000aa3c78949aa4e66728a56ba2c2c4aacf554230b81aa888cb"
+    },
+    {
+      "path": "dist/ember-solitaire/assets/cards/spades/05.webp",
+      "bytes": 13416,
+      "sha256": "49262d8d7bfde1c71d4404d856de80a1065ef32292c2ff2aefd146fcddb5aa9a"
+    },
+    {
+      "path": "dist/ember-solitaire/assets/cards/spades/06.webp",
+      "bytes": 11874,
+      "sha256": "bc700b74689413b406e0a6b1c507dea39822be2fc42587cadfe0e58df15e499b"
+    },
+    {
+      "path": "dist/ember-solitaire/assets/cards/spades/07.webp",
+      "bytes": 13094,
+      "sha256": "e8deeee7aa150519846c1936c026c4ada5505c697a2c503898f7711e8ee7f73b"
+    },
+    {
+      "path": "dist/ember-solitaire/assets/cards/spades/08.webp",
+      "bytes": 14712,
+      "sha256": "846419af352894cc14869dfa0ae3a5b60d804604f5e195f65d8e2a2a7fa68adb"
+    },
+    {
+      "path": "dist/ember-solitaire/assets/cards/spades/09.webp",
+      "bytes": 13946,
+      "sha256": "26e5114575bec371dc9bdd8dc99b6f1afa782c6524fe4d887497e0697bd54785"
+    },
+    {
+      "path": "dist/ember-solitaire/assets/cards/spades/10.webp",
+      "bytes": 16114,
+      "sha256": "393d42371425240fa2fa53ca0b156986cd292b136452dfeb3c3c23cfbecbb098"
+    },
+    {
+      "path": "dist/ember-solitaire/assets/cards/spades/ace.webp",
+      "bytes": 13748,
+      "sha256": "3bb6814ced426c6cad202b48e200d518cc6f31a6f1fdd014fb5d1d154f91d363"
+    },
+    {
+      "path": "dist/ember-solitaire/assets/cards/spades/ace@2x.webp",
+      "bytes": 45066,
+      "sha256": "cf5b1887b6a5380a7967f6c55bbe06519212b9e686fe0983e570eacc33f360dd"
+    },
+    {
+      "path": "dist/ember-solitaire/assets/cards/spades/jack.webp",
+      "bytes": 38880,
+      "sha256": "476ed00e2030350669f4de916607ec827e77d8a98861f718d050c7683dc10b12"
+    },
+    {
+      "path": "dist/ember-solitaire/assets/cards/spades/jack@2x.webp",
+      "bytes": 116832,
+      "sha256": "1d31a19e1380f120301ffe39616c51c19202fe4757a4e144aecdd230aac2ef22"
+    },
+    {
+      "path": "dist/ember-solitaire/assets/cards/spades/king.webp",
+      "bytes": 39952,
+      "sha256": "ac4858804302dd7bf1231864382885eafb3c33a353a27b530a7e1f3948ca502e"
+    },
+    {
+      "path": "dist/ember-solitaire/assets/cards/spades/king@2x.webp",
+      "bytes": 125590,
+      "sha256": "76cdd708b45c399796a0ee0085dbfc571e0afc407529bfda0eb24e06cb760c23"
+    },
+    {
+      "path": "dist/ember-solitaire/assets/cards/spades/queen.webp",
+      "bytes": 38446,
+      "sha256": "b4359f6d65e9377ebe4d9b2fb443882085046e5b9a3e9414f1d0c7746fa22faf"
+    },
+    {
+      "path": "dist/ember-solitaire/assets/cards/spades/queen@2x.webp",
+      "bytes": 117874,
+      "sha256": "1f3184d0f4415804ac05c26f0d10b6c1172381e6a0a0a70a3c859a1dda526a51"
+    },
+    {
+      "path": "dist/ember-solitaire/assets/effects/smoke.webp",
+      "bytes": 26618,
+      "sha256": "2ca0130cfd12d3058a20d2ba73aebc947360c7309545fd89eff214766cc5fcfa"
+    },
+    {
+      "path": "dist/ember-solitaire/assets/environments/anvil.webp",
+      "bytes": 21054,
+      "sha256": "ad536cd2dea882fd9d4b4de961b8c9f7d21235e146ccdac388ff2fd2e684930b"
+    },
+    {
+      "path": "dist/ember-solitaire/assets/environments/forge_chamber_landscape.webp",
+      "bytes": 48120,
+      "sha256": "1d5986d5ce929c50080fdb41671adb81dd3ce0bf79871cb02c5f610d0673d621"
+    },
+    {
+      "path": "dist/ember-solitaire/assets/environments/forge_chamber_portrait.webp",
+      "bytes": 38712,
+      "sha256": "99026641642ca7312807624c35a2901482c1502bb45ee7a4351c867ce7ebc573"
+    },
+    {
+      "path": "dist/ember-solitaire/assets/environments/forge_hall_landscape.webp",
+      "bytes": 46830,
+      "sha256": "9d166be0a3670b8f8f4fbc444b67f020da297fbcf2392110884468e5c0fe2388"
+    },
+    {
+      "path": "dist/ember-solitaire/assets/environments/forge_hall_portrait.webp",
+      "bytes": 37896,
+      "sha256": "91dc6dee69d8b48ba09349f84f8235d5d85b0491bb0f17dd31ce2cbb36d6a683"
+    },
+    {
+      "path": "dist/ember-solitaire/assets/environments/hall_legends_landscape.webp",
+      "bytes": 45774,
+      "sha256": "0a9b44f8d32082d280538c3aba184f7a18d5a553ec1a6f4feb02dab147f615f5"
+    },
+    {
+      "path": "dist/ember-solitaire/assets/environments/hall_legends_portrait.webp",
+      "bytes": 41602,
+      "sha256": "99f1d7ec60df603cc21ae557f29d9125058eec7849b26fdc45bc7773c451bdaf"
+    },
+    {
+      "path": "dist/ember-solitaire/assets/environments/pedestal.webp",
+      "bytes": 19902,
+      "sha256": "62bb35e6a0ca8b92a491872c95bca204af65e29a63110b590269c924a4a09c9d"
+    },
+    {
+      "path": "dist/ember-solitaire/assets/environments/splash_landscape.webp",
+      "bytes": 36410,
+      "sha256": "20fba17106f7b414f2d2004245083c44630f5749c5e975122170d3912957a65c"
+    },
+    {
+      "path": "dist/ember-solitaire/assets/environments/splash_portrait.webp",
+      "bytes": 22430,
+      "sha256": "357000405718b6813fa6491e16650922ea1ee419ab5ea13a03a5bd0eab420e0f"
+    },
+    {
+      "path": "dist/ember-solitaire/assets/environments/table_ember.webp",
+      "bytes": 18222,
+      "sha256": "82f3147baa4d82986e011ce2495888b27c6958f0ddb97a44a3d26565dd232330"
+    },
+    {
+      "path": "dist/ember-solitaire/assets/environments/table_iron.webp",
+      "bytes": 20344,
+      "sha256": "b531b8dd443b09c383a9949f6670529a5413eee7c1cdcd3b30c0bde87f80ce28"
+    },
+    {
+      "path": "dist/ember-solitaire/assets/environments/table_obsidian.webp",
+      "bytes": 13054,
+      "sha256": "7ea8e9d325bb7e89333dfaf5512f709b5d519fac3c2b3cbc315a15f4d28477a1"
+    },
+    {
+      "path": "dist/ember-solitaire/assets/fonts/cinzel-latin-500-normal.woff2",
+      "bytes": 15040,
+      "sha256": "2864b2c9db377e10db43d3ca1ab268c0e10cf3ee94b1a325d104b8e4a74dc7da"
+    },
+    {
+      "path": "dist/ember-solitaire/assets/fonts/cinzel-latin-600-normal.woff2",
+      "bytes": 15204,
+      "sha256": "61efc27ceb7d08bb841652fa8979c0b6833b92548b7f9544c07968a6c02f28e4"
+    },
+    {
+      "path": "dist/ember-solitaire/assets/fonts/cinzel-latin-700-normal.woff2",
+      "bytes": 15184,
+      "sha256": "8efa224fe70fef188a39c095e218b81fd31061809f2752537e33a9ec7b9c2263"
+    },
+    {
+      "path": "dist/ember-solitaire/assets/fonts/inter-latin-400-normal.woff2",
+      "bytes": 23664,
+      "sha256": "8909904ab6c872eb994093482a88a28eca2cd95912d7b6fecd72103b0dc07edc"
+    },
+    {
+      "path": "dist/ember-solitaire/assets/fonts/inter-latin-500-normal.woff2",
+      "bytes": 24272,
+      "sha256": "f3779f1efccc4bdcdf9c0a02ab95bf6bd092ed09c48c08cedc725889edd1d19f"
+    },
+    {
+      "path": "dist/ember-solitaire/assets/fonts/inter-latin-600-normal.woff2",
+      "bytes": 24452,
+      "sha256": "f9a06e79cd3a2a20951c0f0e28f66dd0e6d3fda73911d640a2125c8fcb78f21a"
+    },
+    {
+      "path": "dist/ember-solitaire/assets/fonts/inter-latin-700-normal.woff2",
+      "bytes": 24356,
+      "sha256": "6f56409fd3d64bb85f7d070bce20749db2d66b6d63cec586cc22d1c761be2491"
+    },
+    {
+      "path": "dist/ember-solitaire/assets/ui/borders/metal_tile.webp",
+      "bytes": 1334,
+      "sha256": "e56f31efcb78590aa9220c2f4d4672910326d52890f5a476bb7c2e3446909467"
+    },
+    {
+      "path": "dist/ember-solitaire/css/base.css",
+      "bytes": 18831,
+      "sha256": "864e34fbce6196c947eb9646d4cae38daeb7d7477b4494f77c20e3b703bd5285"
+    },
+    {
+      "path": "dist/ember-solitaire/css/board.css",
+      "bytes": 12552,
+      "sha256": "d0c229cf71e6a4b93ac548914dd4f54296fb41d567b3a6a1cf503a3911b4b11c"
+    },
+    {
+      "path": "dist/ember-solitaire/css/screens.css",
+      "bytes": 35330,
+      "sha256": "1568ace46eaf6db0bd8a87e54d08f406a85c9c36a29958b93bfb1cabf3dcccc0"
+    },
+    {
+      "path": "dist/ember-solitaire/css/tokens.css",
+      "bytes": 4234,
+      "sha256": "fc9ca6350ad74fcfc06f25ad51c324b4109be381e80123bbe6e0dedb56174052"
+    },
+    {
+      "path": "dist/ember-solitaire/ember_spade.png",
+      "bytes": 195273,
+      "sha256": "684b34dcbab80931d1e9475ad05cb1e02ddfa2a14b31946790ba33250ed30492"
+    },
+    {
+      "path": "dist/ember-solitaire/index.html",
+      "bytes": 8796,
+      "sha256": "c2d72ef1413000a3f003853d08594bc19568de87a03ffd8417db9d60900eaee0"
+    },
+    {
+      "path": "dist/ember-solitaire/js/ads.js",
+      "bytes": 10474,
+      "sha256": "1c83b5f3827404ec4a7aff4b12022b252717e17c45263e0514d2ef8c4e54440a"
+    },
+    {
+      "path": "dist/ember-solitaire/js/analytics.js",
+      "bytes": 5213,
+      "sha256": "6d5c42b3b4450e7c3d84e8b366610cd17e53191832ee374ab8e12933751904e7"
+    },
+    {
+      "path": "dist/ember-solitaire/js/app.js",
+      "bytes": 3315,
+      "sha256": "427fcae138f01ff7398da9410cb6f59381ce41246c5c7b3e89f46d3433a8468e"
+    },
+    {
+      "path": "dist/ember-solitaire/js/artifacts.js",
+      "bytes": 24808,
+      "sha256": "762454cb71d71481a6b1941ebff6f552e001b11a497bc174ff9e6e5f64c3ccfb"
+    },
+    {
+      "path": "dist/ember-solitaire/js/audio.js",
+      "bytes": 6063,
+      "sha256": "e1d0646c06d51dc7ad53c1f608d2133c33dbdf99f272abd956c3809154118f45"
+    },
+    {
+      "path": "dist/ember-solitaire/js/board.js",
+      "bytes": 34822,
+      "sha256": "d52c80d0a181207e30df2ae26c3e9fe713e8fff8f5224df9142fd9cad1818b8c"
+    },
+    {
+      "path": "dist/ember-solitaire/js/build-config.js",
+      "bytes": 257,
+      "sha256": "cb1f43ba098bc1dd31897d29559db4253bc6d390ad0dc5d693bca434234adb0d"
+    },
+    {
+      "path": "dist/ember-solitaire/js/ceremony.js",
+      "bytes": 10900,
+      "sha256": "4552ec91c680847679318d4c6fa6671c8c183656a3eed88f3afa5a79cbb374b0"
+    },
+    {
+      "path": "dist/ember-solitaire/js/config.js",
+      "bytes": 2885,
+      "sha256": "a900fa1eb6b86ac198a7d7e4a3bee82aee624b051a3f4c5d275ecd18f9cc34db"
+    },
+    {
+      "path": "dist/ember-solitaire/js/engine.js",
+      "bytes": 15059,
+      "sha256": "5f8cd97b9001eb84fbeecbaf29568db48029b11da291ba30a14571cd92626c04"
+    },
+    {
+      "path": "dist/ember-solitaire/js/fx.js",
+      "bytes": 5937,
+      "sha256": "d0487b0ca4e678829a89ddb8478e8c3620008a372e116f72f5f8f038c40c0c24"
+    },
+    {
+      "path": "dist/ember-solitaire/js/icons.js",
+      "bytes": 5807,
+      "sha256": "7169d8a895fbd050a7ff78c450fb5c4d42f22dfa633453034172fc28e5c5e38b"
+    },
+    {
+      "path": "dist/ember-solitaire/js/manifest.js",
+      "bytes": 4091,
+      "sha256": "9faf716a246da3f3dddbd1fa121935e5a63eb68d472cde80ac5908f6c9a26904"
+    },
+    {
+      "path": "dist/ember-solitaire/js/platform.js",
+      "bytes": 4675,
+      "sha256": "e7dace8fc6a4931f991b694893afbb7e6d7c192d5cc09d2d81164c97348890cd"
+    },
+    {
+      "path": "dist/ember-solitaire/js/screens.js",
+      "bytes": 38402,
+      "sha256": "509b042d535b0e2d8c75f22b772654187ae7df5913b742ad231be020f8432ea4"
+    },
+    {
+      "path": "dist/ember-solitaire/js/store.js",
+      "bytes": 11412,
+      "sha256": "717a11a45b4e31d3b9adbf0c4c54852d0544fa4bf562a35b4fd6b89fd21c576e"
+    },
+    {
+      "path": "dist/ember-solitaire/js/stuck-worker.js",
+      "bytes": 388,
+      "sha256": "12cc46b96c3111fa4968a119c2d324ec24c21d398ddb96e0725fa7d73e2c5978"
+    },
+    {
+      "path": "dist/ember-solitaire/js/tutorial.js",
+      "bytes": 8002,
+      "sha256": "7d31eab8cb56be9eaa6ecca14e6b59b76ad0d485a382f0c3de4c29c4f72dd5d6"
+    },
+    {
+      "path": "dist/ember-solitaire/js/ui.js",
+      "bytes": 10609,
+      "sha256": "29c0cd0702d69fcf22916f26a770a2755eab538b2957a5407b6ab9339b79b0bf"
+    },
+    {
+      "path": "dist/ember-solitaire/manifest.webmanifest",
+      "bytes": 590,
+      "sha256": "15709d79f76b0c094c921791938fafddd95e8c12dc297b88024dfe0dc5770b99"
+    },
+    {
+      "path": "dist/ember-solitaire/privacy.html",
+      "bytes": 3923,
+      "sha256": "2eec034b05667eb1c46f70f1099ec00ff5669a11e29dae8ab471e30fbc1d0255"
+    },
+    {
+      "path": "dist/ember-solitaire/style.css",
+      "bytes": 1929,
+      "sha256": "1e58fbc0d8651c6a14d776c6dd58224551d2b91a4391b237a49ba0c054ea988f"
+    },
+    {
+      "path": "dist/ember-solitaire/sw.js",
+      "bytes": 5928,
+      "sha256": "62f98e4bb19cc13a03ed1581d326972e84cf1f79704478da1b5ab3f07181605b"
+    },
+    {
+      "path": "dist/index.html",
+      "bytes": 9948,
+      "sha256": "96e96e4069256773da1c80778e7f6b557d43549aea3d9880219cc101275aac16"
+    },
+    {
+      "path": "dist/pages.js",
+      "bytes": 1752,
+      "sha256": "f5133e023486ae942c78a38782e7c21fc0ed34620391aee3c111d79507501c32"
+    },
+    {
+      "path": "dist/portfolio/index.html",
+      "bytes": 6631,
+      "sha256": "b33e4f3610dbe65f779f1d69c9953a23ac7c2891c2a34c0be6fa24c08513826e"
+    },
+    {
+      "path": "dist/refinery-concept.png",
+      "bytes": 2060947,
+      "sha256": "307137202f3a92da61709758ca4c3129130c3a69c9c9d4d12bfe2381d7d8e8e9"
+    },
+    {
+      "path": "dist/revive-renew-health.png",
+      "bytes": 678577,
+      "sha256": "5251f1dbcf2bd28da2f4c9a513a283175be767ff662f5cda45ea3b4d98ca9bc2"
+    },
+    {
+      "path": "dist/services/index.html",
+      "bytes": 5951,
+      "sha256": "cc88fe9aabb6f3ad813eae851663d4a8754d149c90f4759ff72ddec984b0466a"
+    },
+    {
+      "path": "dist/style.css",
+      "bytes": 29239,
+      "sha256": "f21274c170cfba24450913cc663f958c13eadce66373134774e32793e6ce7f73"
+    },
+    {
+      "path": "dist/tools/index.html",
+      "bytes": 4516,
+      "sha256": "e1e52375ecdd784235255fe8f901fa9780b1bd96526e7e8b9b20c2336b0d81ab"
+    }
+  ]
+}

@@ -1,0 +1,7 @@
+/dist/
+/.dist-stage-*/
+/.dist-backup-*/
+/.build.lock
+/.phase2-backup/
+/baseline-verification.tmp.json
+/phase2-verification.tmp.json

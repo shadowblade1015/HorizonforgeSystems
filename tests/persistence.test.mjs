@@ -75,7 +75,8 @@ test('malformed profile fields recover independently without coercing valid sibl
   assert.equal(S.state.totalEmber, 1321); assert.equal(S.state.stats.games, 5);
   assert.equal(S.state.stats.wins, 0); assert.equal(S.state.embers, 0);
   assert.deepEqual(plain(S.state.progress.sword), data.progress.sword);
-  assert.deepEqual(plain(S.state.game), data.game);
+  assert.match(S.state.game.settlement.handId, /^h-[0-9a-z]+-[0-9a-z]+-[0-9a-f]{32}$/);
+  assert.deepEqual(plain(S.state.game), { ...data.game, settlement: { v: 1, handId: S.state.game.settlement.handId, victoryPaid: false } });
   assert.equal(storage.get(S.persistence.recoveryKey), raw);
   assert.throws(() => S.inspectImport(raw));
 });
@@ -163,7 +164,9 @@ test('validated import retains prior stored and unsaved progress; rejected input
   for (const raw of ['{', '{"v":3}', JSON.stringify({ v: 2, embers: -1 })]) {
     assert.equal(S.importSave(raw), false); assert.equal(JSON.stringify(plain(S.state)), before); assert.equal(storage.get(S.KEY), profile);
   }
-  assert.equal(S.importSave(hand), true); assert.deepEqual(plain(S.state.game), JSON.parse(hand).game);
+  assert.equal(S.importSave(hand), true);
+  assert.match(S.state.game.settlement.handId, /^h-[0-9a-z]+-[0-9a-z]+-[0-9a-f]{32}$/);
+  assert.deepEqual(plain(S.state.game), { ...JSON.parse(hand).game, settlement: { v: 1, handId: S.state.game.settlement.handId, victoryPaid: false } });
   const copies = S.recoveryCopies().map(k => S.exportRecovery(k));
   assert.ok(copies.includes(profile)); assert.ok(copies.some(raw => JSON.parse(raw).embers === 555));
 });

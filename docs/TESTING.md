@@ -67,11 +67,11 @@ Phase 2: 143 source/output files match the historical baseline (8,496,965 bytes)
 
 ## Known defects: intended behavior fails
 
-`tests/regressions.test.mjs` now runs the F01 assertion as a passing regression and retains three TODO tests asserting desired behavior. See [Phase 3A report](PHASE_3A_REPORT.md). Do not invert assertions to accept defects.
+`tests/regressions.test.mjs` now runs F01 and F02 as passing regressions and retains two F14 TODO tests asserting desired behavior. See [Phase 3B report](PHASE_3B_REPORT.md). Do not invert assertions to accept defects.
 
 | Finding | Intended result | Current reproduction |
 | --- | --- | --- |
-| F02 | One victory / 85 Ember after win, undo, replay | Two victories / 160 Ember; set reward remains high-water protected |
+| F02 (fixed in Phase 3B) | One victory / 85 Ember after win, undo, replay | Passes; persistent per-hand settlement prevents duplicate rewards |
 | F01 (fixed in Phase 3A) | Reject malformed active hand while preserving 321 Ember | Passes; raw original retained and replacement requires recovery confirmation |
 | F14 | Reject lift containing face-down second card | Run accepted |
 | F14 | Do not remove K-A sequence with face-down Ace | Sequence removed |
@@ -99,3 +99,13 @@ Run the same build, verifier and full test commands above. Final Phase 3A suite:
 New persistence tests inject read/write/quota failures and unavailable storage, validate save/hand/history boundaries, preserve valid v2 progress, exercise explicit recovery/import/reset backups and compare input fixture bytes before/after. Minimal DOM tests check event wiring/download data and confirmation boundaries; they do not certify browser layout or real downloads. The helper's inert timers still do not test actual debounce scheduling or lifecycle event delivery.
 
 For recovery, use **Settings ? Save Recovery** or the persistent warning. Export the original before accepting a recovered profile; use the validated import preview to restore an exported v2 copy. Unsupported versions cannot overwrite themselves through autosave/reset. Local backups and quarantine keys are retained; no stored data is cleared automatically. Read-denied sessions stay protected until access is restored and the page can be safely reloaded after exporting memory. Full behavior, key names, results and remaining risks are in [PHASE_3A_REPORT.md](PHASE_3A_REPORT.md).
+
+## Phase 3B victory validation
+
+Run `node build.mjs`, `node tools/verify-source.mjs`, `node --test` and `git diff --check`. Final suite: **107 tests, 105 pass, zero unexpected failures, two known failing F14 TODOs**. The original F02 assertions pass without a TODO. Phase 3A coverage continues to pass.
+
+`tests/victory.test.mjs` adds 29 deterministic victory tests covering every suit mode, duplicate/copy callbacks, undo/replay, reloads, new/restarted identities, daily/achievement/artifact side effects, legacy saves/imports, invalid receipts, failed storage/retries, reentrant writes and calculation-error rollback. Ceremony invocation is exercised with minimal DOM/service stubs; browser animation/timing remains unverified.
+
+The additive `game.settlement` receipt remains in v2 and is outside undo history. Existing fixture bytes are unchanged; exact expected fixture objects now include the receipt and validate its generated ID. Legacy hands whose high-water mark reached eight are treated as already paid, including undone legacy wins. No existing balance or historical statistic is reduced. Victory state and receipt are saved in one full-profile write, with Phase 3A backups/protection/warnings retained.
+
+See [PHASE_3B_REPORT.md](PHASE_3B_REPORT.md) for the lifecycle trace, compatibility policy, complete results, crash-consistency limits and manual browser checks. Multi-tab, F03/F04/F05 and F14 rule repairs remain separate.

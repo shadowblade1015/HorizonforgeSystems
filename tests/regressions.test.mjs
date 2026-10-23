@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { harness, card, position, finalSet } from './helpers.mjs';
 
-test('F02: undo/replay must award only one victory per hand', { todo: 'Known defect F02; remove TODO when fixed' }, () => {
+test('F02: undo/replay must award only one victory per hand', () => {
   const { E, S } = harness(); S.load(); const g = finalSet(E); S.startGame(g);
   S.applyResult(g, E.move(g, 1, 0, 0));
   assert.equal(S.state.stats.wins, 1); assert.equal(S.state.embers, 85);

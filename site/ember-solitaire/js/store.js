@@ -69,6 +69,22 @@
   const own = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
   const clone = v => JSON.parse(JSON.stringify(v));
 
+  const HAND_ID = /^h-[0-9a-z]+-[0-9a-z]+-[0-9a-f]{32}$/;
+  let handSerial = 0;
+  function newHandId() {
+    const words = new Uint32Array(4);
+    if (root.crypto && root.crypto.getRandomValues) root.crypto.getRandomValues(words);
+    else for (let i = 0; i < words.length; i++) words[i] = Math.floor(Math.random() * 0x100000000);
+    return 'h-' + Date.now().toString(36) + '-' + (++handSerial).toString(36) + '-' + [...words].map(n => n.toString(16).padStart(8, '0')).join('');
+  }
+  function prepareHand(game) {
+    if (game && !own(game, 'settlement')) {
+      // Older saves have no receipt. Reaching eight sets already means a legacy
+      // victory may have been paid, including hands subsequently undone.
+      game.settlement = { v: 1, handId: newHandId(), victoryPaid: game.bestCompleted === 8 || game.won === true };
+    }
+  }
+
   function validateHand(g) {
     const fail = () => { throw Error('Invalid or inconsistent saved hand'); };
     if (!object(g) || ![1, 2, 4].includes(g.suits)) fail();
@@ -102,6 +118,11 @@
       return new Map([...p.cols.flat(), ...p.stock].map(c => [c.id, c.up]));
     }
     position(g);
+    if (own(g, 'settlement')) {
+      const receipt = g.settlement;
+      if (!object(receipt) || receipt.v !== 1 || typeof receipt.handId !== 'string' || !HAND_ID.test(receipt.handId) || !boolean(receipt.victoryPaid) || Object.keys(receipt).some(k => !['v', 'handId', 'victoryPaid'].includes(k))) fail();
+      if (receipt.victoryPaid !== (g.bestCompleted === 8)) fail();
+    }
     for (const key of ['cardsMoved', 'hintsUsed', 'undosUsed', 'startedAt']) if (!integer(g[key])) fail();
     if (!number(g.elapsed) || !integer(g.bestCompleted) || g.bestCompleted < g.completed || g.bestCompleted > 8 || !boolean(g.won) || g.won !== (g.completed === 8) || !boolean(g.daily)) fail();
     if (g.seed !== null && (!integer(g.seed) || g.seed > 0xffffffff)) fail();
@@ -229,6 +250,7 @@
         }
       }
     } catch (e) { status('unavailable', 'Saved progress cannot be read. Saving is blocked to protect it. Export this session before leaving.'); }
+    prepareHand(S.game);
     ensureProgress(S.artifact);
     return S;
   }
@@ -253,6 +275,7 @@
     return true;
   }
   function save(now) {
+    if (victoryInProgress) return true; // The complete settlement is flushed together.
     clearTimeout(saveT);
     if (blocked) { status(persistence.code, persistence.message); return false; }
     const run = () => {
@@ -296,6 +319,7 @@
   function inspectImport(raw) {
     const checked = validateProfile(JSON.parse(raw));
     if (checked.issues.length) throw Error('Invalid save: ' + checked.issues.join(', '));
+    prepareHand(checked.profile.game);
     return checked.profile;
   }
   // Called only after explicit replacement confirmation. Both current memory and
@@ -331,7 +355,15 @@
     } catch (e) { status('unsaved', 'Reset could not be saved. Existing progress was kept. Export before leaving.'); return false; }
   }
 
-  function emit(evt) { listeners.forEach(fn => { try { fn(evt); } catch (e) { console.error(e); } }); }
+  let victoryInProgress = false;
+  let victoryNotifications = [];
+  function notify(fn) {
+    if (victoryInProgress) victoryNotifications.push(fn);
+    else fn();
+  }
+  function emit(evt) {
+    if (victoryInProgress) { victoryNotifications.push(() => emit(evt)); return; }
+    listeners.forEach(fn => { try { fn(evt); } catch (e) { console.error(e); } }); }
   function on(fn) { listeners.add(fn); return () => listeners.delete(fn); }
 
   function ensureProgress(id) {
@@ -356,7 +388,7 @@
     if (!n) return;
     S.embers += n; S.totalEmber += n;
     if (!S.firstArtifact) S.firstArtifact = S.artifact;
-    ES.Analytics && ES.Analytics.log('ember_earned', { source: reason || 'other', amount: n });
+    notify(() => { ES.Analytics && ES.Analytics.log('ember_earned', { source: reason || 'other', amount: n }); });
     const p = current();
     p.ember += n;
     let r = n; const need = cost();
@@ -411,6 +443,8 @@
 
   /* ---------- games -------------------------------------------------------- */
   function startGame(game) {
+    if (game === S.game) return;
+    prepareHand(game);
     const prev = S.game;
     if (prev && !prev.won && prev.moves > 0) { S.stats.streak = 0; }
     S.game = game;
@@ -426,33 +460,55 @@
   /* Apply progression for an engine result. Returns {ember, daily, win} */
   function applyResult(g, res) {
     const out = { ember: 0 };
-    if (!res || !res.ok) return out;
-    if (res.type === 'move' || res.type === 'deal') { S.stats.totalMoves++; S.stats.cardsMoved += (res.moved ? res.moved.length : 10); }
-    if (res.newSets) {
-      S.stats.sequences += res.newSets;
-      const e = res.newSets * SET_REWARD; out.ember += e; addEmber(e, 'sequence');
-      g.run = (g.run || 0) + e;
-      if (g.daily && g.dailyKey) {
-        const d = S.daily[g.dailyKey] = S.daily[g.dailyKey] || { sets: 0, rewarded: false, perfect: false };
-        d.sets = Math.max(d.sets, g.bestCompleted);
-        if (!d.rewarded && d.sets >= DAILY_GOAL_SETS) {
-          d.rewarded = true; S.stats.dailies++; out.daily = DAILY_REWARD;
-          addEmber(DAILY_REWARD, 'daily'); g.run += DAILY_REWARD; out.ember += DAILY_REWARD;
+    if (!res || !res.ok || g !== S.game || victoryInProgress) return out;
+    prepareHand(g);
+    const winning = !!res.won;
+    if (winning && (!g.won || g.completed !== 8 || g.settlement.victoryPaid)) return out;
+    // Neither an undo snapshot nor a presentation callback owns this receipt.
+    // Queue notifications/saves so reentrant listeners cannot persist half a win.
+    const previous = winning ? clone(S) : null;
+    if (winning) { victoryInProgress = true; g.settlement.victoryPaid = true; }
+    try {
+      if (res.type === 'move' || res.type === 'deal') { S.stats.totalMoves++; S.stats.cardsMoved += (res.moved ? res.moved.length : 10); }
+      if (res.newSets) {
+        S.stats.sequences += res.newSets;
+        const e = res.newSets * SET_REWARD; out.ember += e; addEmber(e, 'sequence');
+        g.run = (g.run || 0) + e;
+        if (g.daily && g.dailyKey) {
+          const d = S.daily[g.dailyKey] = S.daily[g.dailyKey] || { sets: 0, rewarded: false, perfect: false };
+          d.sets = Math.max(d.sets, g.bestCompleted);
+          if (!d.rewarded && d.sets >= DAILY_GOAL_SETS) {
+            d.rewarded = true; S.stats.dailies++; out.daily = DAILY_REWARD;
+            addEmber(DAILY_REWARD, 'daily'); g.run += DAILY_REWARD; out.ember += DAILY_REWARD;
+          }
         }
       }
+      if (res.won) {
+        const reward = WIN_REWARD[g.suits] || 125;
+        S.stats.wins++; S.stats.bySuits[g.suits].wins++;
+        S.stats.streak++; S.stats.bestStreak = Math.max(S.stats.bestStreak, S.stats.streak);
+        S.stats.lowestMoves = S.stats.lowestMoves == null ? g.moves : Math.min(S.stats.lowestMoves, g.moves);
+        S.stats.bestTimeMs = S.stats.bestTimeMs == null ? g.elapsed : Math.min(S.stats.bestTimeMs, g.elapsed);
+        current().victories++;
+        if (g.daily && g.dailyKey) { const d = S.daily[g.dailyKey] = S.daily[g.dailyKey] || { sets: 8, rewarded: false }; d.perfect = true; }
+        addEmber(reward, 'victory'); g.run = (g.run || 0) + reward;
+        out.win = reward; out.ember += reward;
+      }
+    } catch (error) {
+      if (winning) {
+        const oldGame = previous.game;
+        for (const key of Object.keys(g)) if (!own(oldGame, key)) delete g[key];
+        Object.assign(g, oldGame);
+        Object.assign(S, previous, { game: g });
+        victoryNotifications = [];
+      }
+      throw error;
+    } finally { if (winning) victoryInProgress = false; }
+    save(winning);
+    if (winning) {
+      const notifications = victoryNotifications; victoryNotifications = [];
+      for (const fn of notifications) { try { fn(); } catch (error) { console.error(error); } }
     }
-    if (res.won) {
-      const reward = WIN_REWARD[g.suits] || 125;
-      S.stats.wins++; S.stats.bySuits[g.suits].wins++;
-      S.stats.streak++; S.stats.bestStreak = Math.max(S.stats.bestStreak, S.stats.streak);
-      S.stats.lowestMoves = S.stats.lowestMoves == null ? g.moves : Math.min(S.stats.lowestMoves, g.moves);
-      S.stats.bestTimeMs = S.stats.bestTimeMs == null ? g.elapsed : Math.min(S.stats.bestTimeMs, g.elapsed);
-      current().victories++;
-      if (g.daily && g.dailyKey) { const d = S.daily[g.dailyKey] = S.daily[g.dailyKey] || { sets: 8, rewarded: false }; d.perfect = true; }
-      addEmber(reward, 'victory'); g.run = (g.run || 0) + reward;
-      out.win = reward; out.ember += reward;
-    }
-    save();
     return out;
   }
   function tick(g, ms) { g.elapsed += ms; S.stats.playMs += ms; }

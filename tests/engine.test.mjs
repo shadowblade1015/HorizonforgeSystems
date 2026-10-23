@@ -127,7 +127,10 @@ test('save retains latest 20 history entries without trimming in-memory history'
 test('frozen v2 active-hand fixture resumes with stock, history and daily metadata intact', () => {
   const path = new URL('./fixtures/hand-v2.json', import.meta.url), bytes = readFileSync(path);
   const { E, S, storage } = harness(bytes.toString()); S.load();
-  const original = JSON.parse(bytes); assert.deepEqual(plain(S.state), original);
+  const original = JSON.parse(bytes);
+  assert.match(S.state.game.settlement.handId, /^h-[0-9a-z]+-[0-9a-z]+-[0-9a-f]{32}$/);
+  original.game.settlement = { v: 1, handId: S.state.game.settlement.handId, victoryPaid: false };
+  assert.deepEqual(plain(S.state), original);
   assert.equal(S.state.game.cols.flat().length + S.state.game.stock.length, 104);
   assert.equal(S.state.game.dailyKey, '2026-10-18');
   S.save(true); const reload = harness(storage.get(S.KEY)); reload.S.load();

@@ -17,12 +17,12 @@ test('F01: malformed hand must not be accepted as an active game', () => {
   assert.equal(S.state.game, null, 'Recover the profile while rejecting the malformed hand');
 });
 
-test('F14: a run containing a face-down second card must be rejected', { todo: 'Known defect F14' }, () => {
+test('F14: a run containing a face-down second card must be rejected', () => {
   const { E } = harness();
   assert.equal(E.movable([card('nine', 9), card('eight', 8, 'S', false)], 0), false);
 });
 
-test('F14: a completed sequence with a face-down Ace must remain on the board', { todo: 'Known defect F14' }, () => {
+test('F14: a completed sequence with a face-down Ace must remain on the board', () => {
   const { E } = harness(), g = position(E);
   g.cols[0] = Array.from({ length: 13 }, (_, i) => card('run' + i, 13 - i, 'S', i !== 12));
   assert.equal(E.checkSets(g).length, 0);

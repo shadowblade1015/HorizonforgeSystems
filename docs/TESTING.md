@@ -65,18 +65,18 @@ Phase 2: 143 source/output files match the historical baseline (8,496,965 bytes)
 
 `tests/fixtures/profile-v2.json` and `hand-v2.json` are synthetic sanitized v2 baselines, not real player exports or evidence of compatibility with every historic save. The hand fixture was frozen using this unchanged engine/store with seed 20261018 and one stock deal. Tests resume and round-trip progress/settings/daily records and the active hand/history, and verify input bytes remain unchanged. `corrupt-v2.json` isolates an invalid hand while retaining profile currency. Final-set and face-down fixtures are explicit reusable builders/card arrays in helpers and regression tests.
 
-## Known defects: intended behavior fails
+## Original regression status
 
-`tests/regressions.test.mjs` now runs F01 and F02 as passing regressions and retains two F14 TODO tests asserting desired behavior. See [Phase 3B report](PHASE_3B_REPORT.md). Do not invert assertions to accept defects.
+`tests/regressions.test.mjs` now runs all four original F01/F02/F14 assertions as ordinary passing tests, with no TODO markers. See [Phase 3C report](PHASE_3C_REPORT.md). Assertions were preserved rather than inverted to accept defects.
 
 | Finding | Intended result | Current reproduction |
 | --- | --- | --- |
 | F02 (fixed in Phase 3B) | One victory / 85 Ember after win, undo, replay | Passes; persistent per-hand settlement prevents duplicate rewards |
 | F01 (fixed in Phase 3A) | Reject malformed active hand while preserving 321 Ember | Passes; raw original retained and replacement requires recovery confirmation |
-| F14 | Reject lift containing face-down second card | Run accepted |
-| F14 | Do not remove K-A sequence with face-down Ace | Sequence removed |
+| F14-A (fixed in Phase 3C) | Reject lift containing face-down second card | Passes; every selected card must be face-up |
+| F14-B (fixed in Phase 3C) | Do not remove K-A sequence with face-down Ace | Passes; every completion candidate card must be face-up |
 
-Remove remaining TODOs only when their fixes land, then require those assertions to pass. Phase 1 and Phase 2 execution records above remain historical.
+The original four regressions now pass. This does not close all audit findings. Earlier phase execution records remain historical.
 
 
 ## Browser functionality not tested
@@ -109,3 +109,13 @@ Run `node build.mjs`, `node tools/verify-source.mjs`, `node --test` and `git dif
 The additive `game.settlement` receipt remains in v2 and is outside undo history. Existing fixture bytes are unchanged; exact expected fixture objects now include the receipt and validate its generated ID. Legacy hands whose high-water mark reached eight are treated as already paid, including undone legacy wins. No existing balance or historical statistic is reduced. Victory state and receipt are saved in one full-profile write, with Phase 3A backups/protection/warnings retained.
 
 See [PHASE_3B_REPORT.md](PHASE_3B_REPORT.md) for the lifecycle trace, compatibility policy, complete results, crash-consistency limits and manual browser checks. Multi-tab, F03/F04/F05 and F14 rule repairs remain separate.
+
+## Phase 3C card-rule validation
+
+Run `node build.mjs`, `node tools/verify-source.mjs`, `node --test`, `git diff --check` and `git status --short`. Final result: **152 tests, 152 pass, zero failures/TODOs/skipped/cancelled**. All Phase 3A/3B coverage and original regression assertions pass.
+
+The only application edits are two engine conditions: movable rejects any face-down selected card, and checkSets requires all thirteen candidate cards to be face-up. Existing rank/suit comparisons, valid move semantics, rewards, save validation and settlement receipts are unchanged.
+
+`tests/card-rules.test.mjs` adds 45 targeted checks for legal/invalid suffixes, all thirteen visibility positions, unchanged invalid state, multi-completions/reveal/undo, hints/search, 1/2/4-suit card conservation and historical valid-play equivalence. Canonical endgame fixtures verify solver moves, v2 reload and one daily/victory payout through Phase 3A/3B. Invalid synthetic positions are engine-only; no save checks were relaxed.
+
+Verifier: **143 matching source/output files, zero errors**, 23 syntax checks, two JSON checks, 421 local references, 131 precache URLs and nine routes. Historical archive/inventory remain unchanged; 137 files still match archive bytes. Full details, remaining audit risks and the manual browser checklist are in [PHASE_3C_REPORT.md](PHASE_3C_REPORT.md). F03/F04/F05, broader input hardening and multi-tab/native/browser verification remain separate.

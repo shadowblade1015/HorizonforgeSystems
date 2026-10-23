@@ -76,7 +76,7 @@
   // A run may be lifted from idx if every card is face up, same suit, descending by one.
   function movable(col, idx) {
     const x = col.slice(idx);
-    if (!x.length || !x[0].up) return false;
+    if (!x.length || x.some(c => !c.up)) return false;
     for (let i = 0; i < x.length - 1; i++)
       if (x[i].rank !== x[i + 1].rank + 1 || x[i].suit !== x[i + 1].suit) return false;
     return true;
@@ -103,7 +103,7 @@
       const col = g.cols[c];
       if (col.length < 13) continue;
       const tail = col.slice(-13);
-      let ok = tail[0].rank === 13 && tail[12].rank === 1;
+      let ok = tail.every(c => c.up) && tail[0].rank === 13 && tail[12].rank === 1;
       for (let i = 0; i < 12 && ok; i++)
         if (!tail[i].up || tail[i].suit !== tail[i + 1].suit || tail[i].rank !== tail[i + 1].rank + 1) ok = false;
       if (ok) {

@@ -227,6 +227,7 @@
   }
   function load() {
     clearTimeout(saveT);
+    emit({ type: 'beforeGameChange' });
     S = fresh(); blocked = true; recoverable = false; recoveryKey = null; originalRaw = null; lastGoodRaw = null;
     try {
       originalRaw = storage().getItem(KEY);
@@ -255,6 +256,7 @@
     return S;
   }
   function snapshot() {
+    emit({ type: 'beforeSnapshot' });
     const copy = Object.assign({}, S, { savedAt: Date.now() });
     if (S.game) copy.game = Object.assign({}, S.game, { history: S.game.history.slice(-20) });
     return copy;
@@ -333,6 +335,7 @@
       quarantine(JSON.stringify(snapshot()));
       const json = JSON.stringify(next);
       store.setItem(KEY, json);
+      emit({ type: 'beforeGameChange' });
       S = next; ensureProgress(S.artifact); originalRaw = existing;
       blocked = false; recoverable = false; lastGoodRaw = json;
       status('saved', 'Imported save. Previous progress retained in recovery storage.', false);
@@ -350,6 +353,7 @@
       const next = fresh();
       next.progress[next.artifact] = { tier: 0, heat: 0, started: Date.now(), ember: 0, victories: 0 };
       store.setItem(KEY, JSON.stringify(next));
+      emit({ type: 'beforeGameChange' });
       S = next; lastGoodRaw = JSON.stringify(next); status('saved', '', false); emit({ type: 'reset' });
       return true;
     } catch (e) { status('unsaved', 'Reset could not be saved. Existing progress was kept. Export before leaving.'); return false; }
@@ -445,6 +449,7 @@
   function startGame(game) {
     if (game === S.game) return;
     prepareHand(game);
+    emit({ type: 'beforeGameChange' });
     const prev = S.game;
     if (prev && !prev.won && prev.moves > 0) { S.stats.streak = 0; }
     S.game = game;
@@ -454,6 +459,7 @@
     save(true);
   }
   function abandonGame() {
+    emit({ type: 'beforeGameChange' });
     if (S.game && !S.game.won && S.game.moves > 0) S.stats.streak = 0;
     S.game = null; save(true);
   }

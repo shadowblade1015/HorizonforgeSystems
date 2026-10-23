@@ -74,14 +74,29 @@
     }
     return ES.Engine.newGame(1);
   }
+  function cancelCoach() {
+    if (T.unsubscribe) T.unsubscribe(); T.unsubscribe = null;
+    if (T.el) T.el.remove(); T.el = null; T.g = null; T.step = null; T.pending = null; T.lastRes = null;
+  }
+  function queueStep(name, delay) {
+    T.pending = name; ES.Board.later(() => { if (T.pending === name) { T.pending = null; step(name); } }, delay);
+  }
+  function resume() {
+    if (T.g === ES.Board.game && T.g === S().game && T.el && UI.current === 'game' && !document.hidden) {
+      if (T.pending) queueStep(T.pending, 0); else if (T.step && !T.el.innerHTML) queueStep(T.step, 0);
+    }
+  }
   function start() {
+    cancelCoach();
     const g = tutorialDeal(); g.run = 0; g.tutorial = true;
     g.initial = JSON.parse(JSON.stringify({ cols: g.cols, stock: g.stock }));
     St().startGame(g);
     UI.go('game', { focus: false });
     ES.Board.start(g, { animateDeal: true });
+    T.g = g; T.step = 'move';
+    T.unsubscribe = ES.Board.onInvalidate(kind => { if (kind === 'session') cancelCoach(); });
     mountCoach();
-    setTimeout(() => step('move'), ES.FX.motion() ? 1500 : 100);
+    queueStep('move', ES.FX.motion() ? 1500 : 100);
   }
   function mountCoach() {
     if (T.el) T.el.remove();
@@ -94,6 +109,8 @@
     T.el.querySelectorAll('[data-t]').forEach(b => b.onclick = () => { ES.Audio.play('ui'); const t = b.dataset.t; if (t === 'skip') end(true); else step(t); });
   }
   function step(name) {
+    if (!T.g || T.g !== ES.Board.game || T.g !== S().game || UI.current !== 'game' || !T.el) return;
+    T.pending = null;
     ES.Analytics.log('tutorial_step', { step: name });
     T.step = name; ES.Board.clearHints(); ES.Board.stockHighlight(false);
     const g = ES.Board.game; if (!g) return end();
@@ -115,14 +132,14 @@
     S().ftue.tutorial = true; St().save();
     ES.Board.clearHints(); ES.Board.stockHighlight(false);
     if (T.el) { T.el.classList.remove('is-in'); const e = T.el; setTimeout(() => e.remove(), 300); T.el = null; }
-    T.step = null;
+    T.step = null; T.pending = null; if (T.unsubscribe) T.unsubscribe(); T.unsubscribe = null; T.g = null;
   }
   function notify(res) {
-    if (!T.step || !res || !res.ok) return;
+    if (!T.step || T.g !== ES.Board.game || T.g !== S().game || !res || !res.ok) return;
     T.lastRes = res;
-    if (T.step === 'move' && res.type === 'move') setTimeout(() => step('reveal'), 350);
-    else if (T.step === 'stock' && res.type === 'deal') setTimeout(() => step('goal'), 500);
+    if (T.step === 'move' && res.type === 'move') queueStep('reveal', 350);
+    else if (T.step === 'stock' && res.type === 'deal') queueStep('goal', 500);
   }
 
-  ES.Tutorial = { intro, start, notify, end, get active() { return !!T.step; } };
+  ES.Tutorial = { intro, start, notify, end, resume, get active() { return !!T.step; } };
 })(typeof window !== 'undefined' ? window : globalThis);

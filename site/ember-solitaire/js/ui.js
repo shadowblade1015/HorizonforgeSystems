@@ -7,6 +7,8 @@
   const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
   const I = (n, c) => ES.Icons.icon(n, c);
 
+  let navigation = 0;
+  const sheets = new Set();
   const UI = { current: null, stack: [], renderers: {} };
 
   function esc(s) { return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
@@ -46,12 +48,14 @@
     if (prevName === name && !opts.force) { render(name, opts); return; }
     if (prev && !opts.replace && prevName !== 'splash' && prevName !== 'intro') UI.stack.push(prevName);
     if (UI.stack.length > 12) UI.stack.shift();
-    if (prevName === 'game' && ES.Board) ES.Board.pause(true);
+    const ticket = ++navigation;
+    for (const close of [...sheets]) close();
     UI.current = name;
+    if (ES.Board && ES.Board.setScreen) ES.Board.setScreen(name);
     setEnv(next);
     render(name, opts);
     next.classList.add('is-active');
-    requestAnimationFrame(() => requestAnimationFrame(() => next.classList.add('is-in')));
+    requestAnimationFrame(() => { if (ticket === navigation) requestAnimationFrame(() => { if (ticket === navigation) next.classList.add('is-in'); }); });
     if (prev && prev !== next) {
       prev.classList.remove('is-in');
       const d = ES.FX.motion() ? 320 : 0;
@@ -62,9 +66,9 @@
     tb.classList.toggle('is-hidden', !next.classList.contains('has-tabbar'));
     $$('#tabbar .tab').forEach(t => { const on = t.dataset.tab === next.dataset.tab; t.classList.toggle('is-active', on); on ? t.setAttribute('aria-current', 'page') : t.removeAttribute('aria-current'); });
     ES.FX.setField(next.dataset.field || 'none');
-    if (name === 'game' && ES.Board) ES.Board.pause(false);
+
     const h = next.querySelector('h1, h2, .display');
-    if (opts.focus !== false && h && prevName) { h.setAttribute('tabindex', '-1'); setTimeout(() => h.focus({ preventScroll: true }), 30); }
+    if (opts.focus !== false && h && prevName) { h.setAttribute('tabindex', '-1'); setTimeout(() => { if (ticket === navigation && UI.current === name) h.focus({ preventScroll: true }); }, 30); }
   }
   function back(fallback) {
     let p = UI.stack.pop();
@@ -87,6 +91,8 @@
 
   /* ---------- sheets (modal dialogs) --------------------------------------- */
   function sheet(o) {
+    const release = ES.Board && ES.Board.hold ? ES.Board.hold() : () => {};
+    let closed = false, unsubscribe = () => {};
     const wrap = document.createElement('div');
     wrap.className = 'overlay'; wrap.setAttribute('role', 'dialog'); wrap.setAttribute('aria-modal', 'true');
     if (o.title) wrap.setAttribute('aria-label', o.title);
@@ -99,25 +105,32 @@
     </div></div>`;
     const prevFocus = document.activeElement;
     document.getElementById('app').appendChild(wrap);
-    requestAnimationFrame(() => wrap.classList.add('is-in'));
+    const enterFrame = requestAnimationFrame(() => { if (!closed) wrap.classList.add('is-in'); });
+    let focusTimer;
     const close = (val) => {
+      if (closed) return; closed = true; wrap.lifecycleClosed = true;
+      clearTimeout(focusTimer); cancelAnimationFrame(enterFrame); sheets.delete(close); unsubscribe(); release();
       wrap.classList.remove('is-in'); document.removeEventListener('keydown', onKey, true);
       setTimeout(() => wrap.remove(), ES.FX.motion() ? 220 : 0);
-      if (prevFocus && prevFocus.focus) prevFocus.focus({ preventScroll: true });
+      if (prevFocus && prevFocus.isConnected !== false && prevFocus.focus) prevFocus.focus({ preventScroll: true });
       o.onClose && o.onClose(val);
     };
     const onKey = e => {
+      if (closed) return;
       if (e.key === 'Escape' && o.closable !== false) { e.stopPropagation(); close(); }
       if (e.key === 'Tab') { const f = [...wrap.querySelectorAll('button, [href], input, select, [tabindex]:not([tabindex="-1"])')].filter(x => !x.disabled); if (!f.length) return; const a = f[0], z = f[f.length - 1]; if (e.shiftKey && document.activeElement === a) { z.focus(); e.preventDefault(); } else if (!e.shiftKey && document.activeElement === z) { a.focus(); e.preventDefault(); } }
     };
     document.addEventListener('keydown', onKey, true);
+    sheets.add(close);
+    if (ES.Board && ES.Board.onInvalidate) unsubscribe = ES.Board.onInvalidate(kind => { if (kind !== 'pause') close(); });
     wrap.addEventListener('click', e => {
+      if (closed) return;
       if (e.target === wrap && o.closable !== false) return close();
       if (e.target.closest('.sheet-x')) return close();
       const b = e.target.closest('[data-i]'); if (b) { ES.Audio.play('ui'); const a = o.actions[+b.dataset.i]; if (a.onClick && a.onClick(close) === false) return; if (!a.keepOpen) close(a.value); }
     });
     if (o.onMount) o.onMount(wrap, close);
-    setTimeout(() => { const f = wrap.querySelector(o.focus || '.btn-primary, .btn, button'); f && f.focus({ preventScroll: true }); }, 60);
+    focusTimer = setTimeout(() => { if (closed) return; const f = wrap.querySelector(o.focus || '.btn-primary, .btn, button'); f && f.focus({ preventScroll: true }); }, 60);
     return close;
   }
 
@@ -152,11 +165,18 @@
   }
   /* Animate heat from a to b (used after victories) */
   function animateHeat(scope, id, from, to, ms) {
-    const s = scope.querySelector('svg.artifact-svg'); if (!s) return;
-    if (!ES.FX.motion()) { ES.Artifacts.setHeat(s, id, to); return; }
+    const s = scope.querySelector('svg.artifact-svg'); if (!s) return () => {};
+    let stopped = false, frame = 0;
+    const cancel = () => { stopped = true; cancelAnimationFrame(frame); };
+    if (!ES.FX.motion()) { ES.Artifacts.setHeat(s, id, to); return cancel; }
     const t0 = performance.now();
-    const step = now => { const k = Math.min(1, (now - t0) / ms), e = 1 - Math.pow(1 - k, 3); ES.Artifacts.setHeat(s, id, from + (to - from) * e); if (k < 1) requestAnimationFrame(step); };
-    requestAnimationFrame(step);
+    const step = now => {
+      if (stopped || scope.isConnected === false || s.isConnected === false) return;
+      const k = Math.min(1, (now - t0) / ms), e = 1 - Math.pow(1 - k, 3);
+      ES.Artifacts.setHeat(s, id, from + (to - from) * e);
+      if (k < 1) frame = requestAnimationFrame(step);
+    };
+    frame = requestAnimationFrame(step); return cancel;
   }
 
   /* ---------- persistence status and player-controlled recovery ------------ */
@@ -183,6 +203,7 @@
         <button class="btn btn-block" id="saveAccept">Use recovered progress</button>
         <label for="saveImport">Choose a save to import</label><input id="saveImport" type="file" accept="application/json,.json">
       </div>`, onMount(wrap, close) {
+      const owner = store.state;
       const message = wrap.querySelector('#recoveryMessage');
       const show = () => { message.textContent = store.persistence.message || 'Progress is saved on this device.'; wrap.querySelector('#saveAccept').disabled = !store.canRecover; };
       show();
@@ -202,13 +223,15 @@
         const file = e.target.files[0]; if (!file) return;
         try {
           if (file.size > 5 * 1024 * 1024) throw Error('Save file is too large (maximum 5 MB).');
-          const raw = await file.text(), next = store.inspectImport(raw);
+          const raw = await file.text();
+          if (wrap.lifecycleClosed || wrap.isConnected === false || store.state !== owner) return;
+          const next = store.inspectImport(raw);
           sheet({ title: 'Replace current progress?', body: `<p>This save has ${esc(n(next.embers))} Ember and ${esc(n(next.stats.wins))} wins. Your current stored and in-memory progress will be retained as recovery copies. Import replaces progress; it does not merge rewards.</p>`, actions: [{ label: 'Keep current progress' }, { label: 'Import this save', primary: true, onClick: () => {
             if (store.importSave(raw)) { if (ES.Board) ES.Board.pause(true); close(); applySettings(); go('home'); toast('Save imported. Previous copies retained.'); }
             else show();
           } }] });
-        } catch (error) { message.textContent = 'Import rejected: ' + error.message; }
-        e.target.value = '';
+        } catch (error) { if (!wrap.lifecycleClosed && wrap.isConnected !== false) message.textContent = 'Import rejected: ' + error.message; }
+        if (!wrap.lifecycleClosed && wrap.isConnected !== false) e.target.value = '';
       };
     } });
   }

@@ -13,14 +13,53 @@
     el.setAttribute('role', 'dialog'); el.setAttribute('aria-modal', 'true');
     el.innerHTML = html;
     document.getElementById('app').appendChild(el);
-    requestAnimationFrame(() => el.classList.add('is-in'));
+    const entrance = requestAnimationFrame(() => { if (el.isConnected !== false) el.classList.add('is-in'); });
+    el.cancelEntrance = () => cancelAnimationFrame(entrance);
     return el;
   }
-  function closeLayer(el) { el.classList.remove('is-in'); setTimeout(() => el.remove(), ES.FX.motion() ? 400 : 0); }
-  const wait = ms => new Promise(r => setTimeout(r, ES.FX.motion() ? ms : Math.min(ms, 60)));
+  function closeLayer(el) { el.cancelEntrance(); el.classList.remove('is-in'); setTimeout(() => el.remove(), ES.FX.motion() ? 400 : 0); }
+
+  function ownScene(el) {
+    const board = ES.Board, token = board.captureView(), waits = new Set(), timers = new Set(), heat = new Set();
+    let closed = false;
+    const current = () => !closed && board.isCurrent(token);
+    const dispose = (fade = false) => {
+      if (closed) return; closed = true; unsubscribe(); el.cancelEntrance();
+      for (const id of timers) board.cancelLater(id); timers.clear();
+      for (const waiter of waits) if (waiter.cancelWait) waiter.cancelWait(); waits.clear();
+      for (const cancel of heat) if (typeof cancel === 'function') cancel(); heat.clear();
+      if (fade) closeLayer(el); else el.remove();
+    };
+    const unsubscribe = board.onInvalidate(() => dispose());
+    return {
+      current, dispose,
+      wait(ms) { if (!current()) return Promise.resolve(false); const waiter = {}; waits.add(waiter); return board.wait(ES.FX.motion() ? ms : Math.min(ms, 60), token, waiter).finally(() => waits.delete(waiter)); },
+      later(fn, ms) { const id = board.later(() => { timers.delete(id); if (current()) fn(); }, ms, token); timers.add(id); },
+      animate(cancel) { heat.add(cancel); }
+    };
+  }
 
   /* ---------- victory ------------------------------------------------------ */
+  const shownVictories = new WeakSet();
+  let activeVictory = null;
   function victory(g, out) {
+    const board = ES.Board, token = board && board.capture();
+    const owns = () => S().game === g && g.won && (!UI.current || UI.current === 'game') && (!board || board.isSession(token));
+    if (!owns() || (board && !board.canPresent(token)) || shownVictories.has(g) || activeVictory) return false;
+    shownVictories.add(g);
+    const tasks = new Set(), heatAnimations = new Set();
+    let closed = false, el, unsubscribe = () => {};
+    const valid = () => !closed && owns();
+    const defer = (fn, ms) => { const id = setTimeout(() => { tasks.delete(id); if (valid()) fn(); }, ms); tasks.add(id); };
+    const dispose = (fade = false) => {
+      if (closed) return; closed = true; unsubscribe();
+      for (const id of tasks) clearTimeout(id); tasks.clear();
+      for (const cancel of heatAnimations) if (typeof cancel === 'function') cancel(); heatAnimations.clear();
+      if (el) { if (fade) closeLayer(el); else { el.cancelEntrance(); el.remove(); } }
+      if (activeVictory === dispose) activeVictory = null;
+    };
+    activeVictory = dispose;
+    if (board) unsubscribe = board.onInvalidate(kind => { if (kind !== 'pause') dispose(); });
     ES.Audio.play('victory'); ES.Audio.haptic([20, 60, 30]);
     ES.Analytics.log('game_win', { suits: g.suits, moves: g.moves, seconds: Math.round(g.elapsed / 1000), daily: !!g.daily });
     if (out.daily || (g.daily && g.won)) ES.Analytics.log('daily_complete', { perfect: !!g.won });
@@ -28,7 +67,7 @@
     const def = A().get(S().artifact), p = St().current(), heat = St().heatPct();
     let ready = St().ready();
     const before = Math.max(0, heat - Math.round((out.ember || 0) / St().cost() * 100));
-    const el = layer('victory', `
+    el = layer('victory', `
       <div class="cer-bg" style="background-image:url('${ES.Manifest.envSrc('forgeChamber')}')"></div>
       <div class="cer-inner content">
         <div class="caps center">${g.daily ? 'Daily Challenge' : g.suits + ' Suit · Spider'}</div>
@@ -50,26 +89,33 @@
         </div>
       </div>`);
     UI.wireHeat(el, def.id, before);
-    setTimeout(() => { UI.animateHeat(el, def.id, before, heat, 1500); const f = el.querySelector('.vic-bar .fill'); if (f) f.style.setProperty('--p', heat / 100); ES.FX.sparks(innerWidth / 2, innerHeight * 0.45, 14, 90, { up: true }); }, 500);
+    defer(() => { heatAnimations.add(UI.animateHeat(el, def.id, before, heat, 1500)); const f = el.querySelector('.vic-bar .fill'); if (f) f.style.setProperty('--p', heat / 100); ES.FX.sparks(innerWidth / 2, innerHeight * 0.45, 14, 90, { up: true }); }, 500);
     ES.FX.setField('ceremony');
-    const done = () => { St().abandonGame(); closeLayer(el); };
+    const done = () => { if (!valid()) return false; dispose(true); St().abandonGame(); return true; };
     let leaving = false;
     // Natural break after a finished game: a capped interstitial may play here, never before a strike ceremony.
-    const leave = async (next, withAd) => { if (leaving) return; leaving = true; if (withAd) await ES.Ads.maybeInterstitial('post_game'); done(); next(); };
-    el.querySelector('#vicForge').onclick = () => leave(() => { UI.go('forge'); if (ready) setTimeout(strike, 500); }, !ready);
+    const leave = async (next, withAd) => {
+      if (leaving || !valid()) return; leaving = true;
+      try { if (withAd) await ES.Ads.maybeInterstitial('post_game'); } catch (error) { /* navigation still requires ownership */ }
+      if (!valid()) return;
+      if (done()) next();
+    };
+    el.querySelector('#vicForge').onclick = () => leave(() => { UI.go('forge'); if (ready) { const ticket = board && board.capture(); setTimeout(() => { if (UI.current === 'forge' && (!board || board.isCurrent(ticket))) strike(); }, 500); } }, !ready);
     el.querySelector('#vicAgain').onclick = () => leave(() => ES.Screens.newGame(g.suits, { source: 'play_again' }), true);
     const vs = el.querySelector('#vicStoke');
     if (vs) vs.onclick = async () => {
+      if (!valid()) return;
       const fromPct = St().heatPct();
-      const r = await ES.Screens.stoke('victory'); if (!r.granted) return;
+      const r = await ES.Screens.stoke('victory'); if (!valid() || !r.granted) return;
       vs.remove();
       const emb = el.querySelector('.vic-stats .ember'); g.run = (g.run || 0) + r.amount; if (emb) emb.textContent = '+' + n(g.run);
-      const to = St().heatPct(); UI.animateHeat(el, def.id, fromPct, to, 1000);
+      const to = St().heatPct(); heatAnimations.add(UI.animateHeat(el, def.id, fromPct, to, 1000));
       const f = el.querySelector('.vic-bar .fill'); if (f) f.style.setProperty('--p', to / 100);
       el.querySelector('#vicPct').textContent = to + '%';
       if (St().ready() && !ready) { ready = true; const b = el.querySelector('#vicForge'); b.textContent = 'Strike the Forge'; b.parentElement.classList.add('is-ready'); }
     };
-    setTimeout(() => el.querySelector('#vicForge').focus(), 400);
+    defer(() => el.querySelector('#vicForge').focus(), 400);
+    return true;
   }
 
   /* ---------- hammer SVG ---------------------------------------------------- */
@@ -99,31 +145,32 @@
         <div class="cta"><button class="btn btn-primary" id="tfContinue">Continue</button></div>
       </div>
       ${canSkip ? '<button class="link-btn tf-skip" id="tfSkip">Skip</button>' : ''}`);
+    const scene = ownScene(el);
     const stage = el.querySelector('#tfStage');
     UI.wireHeat(stage, id, 100);
     const swap = () => { stage.innerHTML = UI.artifactStage(id, to, 0, { prop: 'anvil' }); UI.wireHeat(stage, id, 0); };
-    const finish = () => { el.classList.add('show-title'); setTimeout(() => el.querySelector('#tfContinue').focus(), 50); };
+    const finish = () => { if (!scene.current()) return; el.classList.add('show-title'); scene.later(() => el.querySelector('#tfContinue').focus(), 50); };
     const sk = el.querySelector('#tfSkip');
-    if (sk) sk.onclick = () => { skipped = true; el.classList.add('skipped'); swap(); finish(); };
-    el.querySelector('#tfContinue').onclick = () => { closeLayer(el); ES.FX.setField('forge'); UI.go('forge', { force: true }); };
+    if (sk) sk.onclick = () => { if (!scene.current()) return; skipped = true; el.classList.add('skipped'); swap(); finish(); };
+    el.querySelector('#tfContinue').onclick = () => { if (!scene.current()) return; scene.dispose(true); ES.FX.setField('forge'); UI.go('forge', { force: true }); };
     ES.FX.setField('none');
-    await wait(500); if (skipped) return;
+    await scene.wait(500); if (!scene.current() || skipped) return;
     el.classList.add('glow'); ES.Audio.play('ember');
-    await wait(700); if (skipped) return;
+    await scene.wait(700); if (!scene.current() || skipped) return;
     ES.FX.setField('ceremony');
     const r = stage.getBoundingClientRect();
     for (let k = 0; k < 2; k++) {
       el.classList.remove('swing'); void el.offsetWidth; el.classList.add('swing');
-      await wait(380); if (skipped) return;
+      await scene.wait(380); if (!scene.current() || skipped) return;
       ES.Audio.play('strike'); ES.Audio.haptic([30, 40, 60]);
       el.classList.remove('impact'); void el.offsetWidth; el.classList.add('impact');
       ES.FX.sparks(r.left + r.width / 2, r.top + r.height * 0.55, 26, 140, { up: true, dur: 800 });
-      if (k === 1) { el.classList.add('white'); setTimeout(swap, 120); }
-      await wait(k === 0 ? 700 : 900); if (skipped) return;
+      if (k === 1) { el.classList.add('white'); scene.later(swap, 120); }
+      await scene.wait(k === 0 ? 700 : 900); if (!scene.current() || skipped) return;
     }
     el.classList.remove('white');
-    UI.animateHeat(stage, id, 0, St().heatPct(), 1200);
-    await wait(500); if (skipped) return;
+    scene.animate(UI.animateHeat(stage, id, 0, St().heatPct(), 1200));
+    await scene.wait(500); if (!scene.current() || skipped) return;
     finish();
   }
 
@@ -150,23 +197,24 @@
         </div>
         <div class="cta is-ready"><button class="btn btn-primary btn-block" id="lgPlace">Place in Hall</button></div>
       </div>`);
+    const scene = ownScene(el);
     const stage = el.querySelector('#lgStage');
     UI.wireHeat(stage, id, 0);
-    el.querySelector('#lgPlace').onclick = () => { closeLayer(el); ES.Screens.hallFocus(id); UI.go('hall', { force: true }); ES.Audio.play('strike'); };
-    await wait(700);
+    el.querySelector('#lgPlace').onclick = () => { if (!scene.current()) return; scene.dispose(); ES.Screens.hallFocus(id); UI.go('hall', { force: true }); ES.Audio.play('strike'); };
+    await scene.wait(700); if (!scene.current()) return;
     el.classList.add('silhouette');
-    await wait(900);
+    await scene.wait(900); if (!scene.current()) return;
     el.classList.add('channels'); ES.Audio.play('ember');
-    UI.animateHeat(stage, id, 0, 100, 2400);
-    await wait(2500);
+    scene.animate(UI.animateHeat(stage, id, 0, 100, 2400));
+    await scene.wait(2500); if (!scene.current()) return;
     ES.Audio.play('strike'); ES.Audio.haptic([40, 60, 80]);
     el.classList.add('reveal', 'white');
     ES.FX.setField('ceremony');
     const r = stage.getBoundingClientRect(); ES.FX.sparks(r.left + r.width / 2, r.top + r.height / 2, 30, 160, { up: true, dur: 900 });
-    await wait(400); el.classList.remove('white');
-    await wait(900); el.classList.add('show-title');
-    await wait(1200); el.classList.add('show-stats');
-    setTimeout(() => el.querySelector('#lgPlace').focus(), 100);
+    await scene.wait(400); if (!scene.current()) return; el.classList.remove('white');
+    await scene.wait(900); if (!scene.current()) return; el.classList.add('show-title');
+    await scene.wait(1200); if (!scene.current()) return; el.classList.add('show-stats');
+    scene.later(() => el.querySelector('#lgPlace').focus(), 100);
   }
 
   ES.Ceremony = { victory, strike, legendary };

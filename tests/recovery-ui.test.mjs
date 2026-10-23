@@ -23,7 +23,7 @@ function uiHarness(raw = null, options = {}) {
   }
   const app = new Element('app'); ids.set('app',app);
   const document = { createElement(tag) { const el = new Element(tag); created.push(el); return el; }, getElementById: id => ids.get(id), querySelector: s => ids.get(s.slice(1)), querySelectorAll: () => [], body: new Element('body'), addEventListener() {}, removeEventListener() {}, activeElement: null };
-  const result = harness(raw, { ...options, globals: { document, addEventListener() {}, requestAnimationFrame: fn => fn(), Blob, URL: { createObjectURL(blob) { downloads.push(blob); return 'blob:test'; }, revokeObjectURL() {} } } });
+  const result = harness(raw, { ...options, globals: { document, addEventListener() {}, requestAnimationFrame: fn => fn(), cancelAnimationFrame() {}, Blob, URL: { createObjectURL(blob) { downloads.push(blob); return 'blob:test'; }, revokeObjectURL() {} } } });
   const es = result.context.ES;
   es.Icons = { icon: () => '' }; es.FX = { motion: () => false }; es.Audio = { play() {}, apply() {} };
   vm.runInContext(readFileSync(new URL('../site/ember-solitaire/js/ui.js', import.meta.url), 'utf8'), result.context);

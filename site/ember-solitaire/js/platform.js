@@ -73,8 +73,8 @@
     if (App) {
       App.addListener('backButton', onBack);
       App.addListener('appStateChange', ({ isActive }) => {
-        if (!isActive) { ES.Store.save(true); ES.Board && ES.Board.pause(true); ES.Analytics.flushSession(); }
-        else { if (ES.UI.current === 'game' && !topOverlay()) ES.Board.pause(false); ES.Ads && ES.Ads.onResume(); }
+        if (!isActive) { if (ES.Board) ES.Board.setAppActive(false); ES.Store.save(true); ES.Analytics.flushSession(); }
+        else { ES.Board && ES.Board.setAppActive(true); ES.Ads && ES.Ads.onResume(); }
       });
     }
     call('StatusBar', 'setStyle', { style: 'DARK' });

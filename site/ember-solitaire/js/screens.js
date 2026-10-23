@@ -21,7 +21,7 @@
     ES.Board.start(g, { animateDeal: true });
     ES.Analytics.log('game_start', { suits, daily: !!opts.daily, source: opts.source || (opts.daily ? 'daily' : 'modes') });
     if (opts.daily) ES.Analytics.log('daily_start', {});
-    requestAnimationFrame(() => requestAnimationFrame(() => ES.Analytics.log('game_start_latency', { ms: Math.round(performance.now() - t0), suits })));
+    ES.Board.frame(() => ES.Board.frame(() => ES.Analytics.log('game_start_latency', { ms: Math.round(performance.now() - t0), suits })));
     return g;
   }
   function resumeGame() {
@@ -44,7 +44,7 @@
   R.game = function () { UI.hydrateIcons($('#scr-game')); };
 
   function pauseMenu() {
-    const g = ES.Board.game; ES.Board.pause(true);
+    const g = ES.Board.game; if (!g || g !== S().game) return;
     UI.sheet({
       kicker: 'Paused', title: 'The Forge Waits',
       body: g ? `<div class="pause-stats"><div><span class="caps dim">Time</span><b>${UI.clock(g.elapsed)}</b></div><div><span class="caps dim">Moves</span><b>${g.moves}</b></div><div><span class="caps dim">Sets</span><b>${g.completed}/8</b></div><div><span class="caps dim">Ember</span><b>+${g.run || 0}</b></div></div>` : '',
@@ -58,11 +58,11 @@
           same.run = 0; St().startGame(same); ES.Board.start(same, { animateDeal: true });
           ES.Analytics.log('game_start', { suits: same.suits, daily: !!same.daily, source: 'restart' });
         } },
-        { label: 'New game', icon: 'cards', onClick: () => { const long = endGame(g, 'abandon'); St().abandonGame(); (long ? ES.Ads.maybeInterstitial('abandon_long_game') : Promise.resolve()).then(() => UI.go('modes')); } },
+        { label: 'New game', icon: 'cards', onClick: () => { const long = endGame(g, 'abandon'); St().abandonGame(); const ticket = ES.Board.capture(), page = UI.current; (long ? ES.Ads.maybeInterstitial('abandon_long_game') : Promise.resolve()).then(() => { if (ES.Board.isSession(ticket) && UI.current === page) UI.go('modes'); }); } },
         { label: 'Settings', icon: 'settings', onClick: () => UI.go('settings') },
         { label: 'Return to forge', ghost: true, icon: 'forge', onClick: () => { St().save(true); UI.go('home'); } }
       ],
-      onClose: () => ES.Board.pause(false)
+      onClose: () => {}
     });
   }
 
@@ -165,7 +165,9 @@
       <span class="stoke-ico">${I('flame')}</span><span class="stoke-txt"><b>Stoke the Forge</b><span>Watch a short ad · +${ES.Ads.rewardAmount()} Ember</span></span><span class="stoke-tag">AD</span></button>`;
   }
   async function stoke(placement, fromHeat) {
+    const owner = S(), page = UI.current, artifact = S().artifact, ticket = ES.Board.capture();
     const r = await ES.Ads.showRewarded(placement);
+    if (S() !== owner || UI.current !== page || S().artifact !== artifact || ES.Board.capture().session !== ticket.session) return r;
     if (!r.granted) { ES.UI.toast('No Ember this time. The ad was not finished.'); if (placement === 'forge') R.forge(); return r; }
     ES.UI.toast(`The forge roars · +${r.amount} Ember`, 'ember'); ES.Audio.play('ember');
     if (placement === 'forge') { R.forge.pendingHeat = [fromHeat, St().heatPct()]; R.forge(); }
@@ -175,21 +177,21 @@
   /* ---------- dead end -------------------------------------------------------- */
   function stuckSheet(g) {
     if (document.querySelector('.overlay') || ES.UI.current !== 'game' || (ES.Tutorial && ES.Tutorial.active)) return;
-    ES.Board.pause(true);
+    if (g !== S().game || g !== ES.Board.game || g.won) return;
     ES.Analytics.log('stuck_shown', { suits: g.suits, sets: g.completed });
     const act = a => ES.Analytics.log('stuck_action', { action: a });
     UI.sheet({
       kicker: 'No useful moves', title: 'The Forge Has Gone Cold',
       body: `<p class="center small muted">None of the next several moves uncovers a card, builds a run or frees a column${g.stock.length ? ', and the stock needs every column filled' : ', and the stock is empty'}.</p>`,
       actions: [
-        ...(g.history.length ? [{ label: 'Undo last move', primary: true, icon: 'undo', onClick: () => { act('undo'); ES.Board.doUndo(); } }] : []),
+        ...(g.history.length ? [{ label: 'Undo last move', primary: true, icon: 'undo', onClick: close => { act('undo'); close(); ES.Board.doUndo(); } }] : []),
         { label: 'Restart this deal', icon: 'restart', primary: !g.history.length, onClick: () => {
           act('restart'); endGame(g, 'stuck_restart');
           const same = ES.Engine.newGame(g.suits, g.seed != null ? { seed: g.seed, daily: g.daily, dailyKey: g.dailyKey } : {});
           if (g.initial) { same.cols = JSON.parse(JSON.stringify(g.initial.cols)); same.stock = JSON.parse(JSON.stringify(g.initial.stock)); same.initial = g.initial; }
           same.run = 0; St().startGame(same); ES.Board.start(same, { animateDeal: true });
         } },
-        { label: 'New deal', icon: 'cards', onClick: () => { act('new'); const long = endGame(g, 'stuck'); St().abandonGame(); (long ? ES.Ads.maybeInterstitial('stuck') : Promise.resolve()).then(() => newGame(g.suits, { source: 'stuck' })); } },
+        { label: 'New deal', icon: 'cards', onClick: () => { act('new'); const long = endGame(g, 'stuck'); St().abandonGame(); const ticket = ES.Board.capture(), page = UI.current; (long ? ES.Ads.maybeInterstitial('stuck') : Promise.resolve()).then(() => { if (ES.Board.isSession(ticket) && UI.current === page) newGame(g.suits, { source: 'stuck' }); }); } },
         { label: 'Keep looking', ghost: true, onClick: () => act('dismiss') }
       ],
       onClose: () => ES.Board.pause(false)

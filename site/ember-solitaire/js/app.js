@@ -9,6 +9,7 @@
   async function boot() {
     try { await ES.Platform.hydrate(St.KEY); } catch (e) {}
     St.load();
+    UI.mountSaveStatus();
     ES.Platform.init();
     UI.applySettings();
     UI.hydrateIcons(document);

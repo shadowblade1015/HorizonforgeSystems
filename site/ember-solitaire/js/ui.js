@@ -108,7 +108,7 @@
     };
     const onKey = e => {
       if (e.key === 'Escape' && o.closable !== false) { e.stopPropagation(); close(); }
-      if (e.key === 'Tab') { const f = [...wrap.querySelectorAll('button, [href], input, [tabindex]:not([tabindex="-1"])')].filter(x => !x.disabled); if (!f.length) return; const a = f[0], z = f[f.length - 1]; if (e.shiftKey && document.activeElement === a) { z.focus(); e.preventDefault(); } else if (!e.shiftKey && document.activeElement === z) { a.focus(); e.preventDefault(); } }
+      if (e.key === 'Tab') { const f = [...wrap.querySelectorAll('button, [href], input, select, [tabindex]:not([tabindex="-1"])')].filter(x => !x.disabled); if (!f.length) return; const a = f[0], z = f[f.length - 1]; if (e.shiftKey && document.activeElement === a) { z.focus(); e.preventDefault(); } else if (!e.shiftKey && document.activeElement === z) { a.focus(); e.preventDefault(); } }
     };
     document.addEventListener('keydown', onKey, true);
     wrap.addEventListener('click', e => {
@@ -159,6 +159,73 @@
     requestAnimationFrame(step);
   }
 
+  /* ---------- persistence status and player-controlled recovery ------------ */
+  function downloadSave(raw, filename) {
+    if (raw === null) { toast('No recovery copy is available.'); return; }
+    try {
+      const url = URL.createObjectURL(new Blob([raw], { type: 'application/json' }));
+      const a = document.createElement('a'); a.href = url; a.download = filename;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (e) { toast('Download failed. Keep this page open and try another browser.'); }
+  }
+  function saveRecovery() {
+    const store = ES.Store;
+    sheet({ title: 'Save Recovery', body: `<p class="small" id="recoveryMessage" role="status"></p>
+      <p class="small muted">Export before closing this page. Import replaces current progress only after confirmation; previous copies are kept on this device. No saves are deleted automatically.</p>
+      <div class="menu-list">
+        <button class="btn btn-block" id="saveExport">Export current progress</button>
+        <button class="btn btn-block" id="saveOriginal">Export original save</button>
+        <button class="btn btn-block" id="saveBackup">Export last good backup</button>
+        <label for="recoveryCopy">Retained recovery copies</label><select id="recoveryCopy" aria-label="Retained recovery copy"></select>
+        <button class="btn btn-block" id="saveCopy">Export selected recovery copy</button>
+        <button class="btn btn-block" id="saveRetry">Retry saving</button>
+        <button class="btn btn-block" id="saveAccept">Use recovered progress</button>
+        <label for="saveImport">Choose a save to import</label><input id="saveImport" type="file" accept="application/json,.json">
+      </div>`, onMount(wrap, close) {
+      const message = wrap.querySelector('#recoveryMessage');
+      const show = () => { message.textContent = store.persistence.message || 'Progress is saved on this device.'; wrap.querySelector('#saveAccept').disabled = !store.canRecover; };
+      show();
+      wrap.querySelector('#saveExport').onclick = () => { try { downloadSave(store.exportSave(), 'ember-save-v2.json'); } catch (e) { message.textContent = e.message; } };
+      wrap.querySelector('#saveOriginal').onclick = () => downloadSave(store.exportOriginal(), 'ember-original-save.json');
+      wrap.querySelector('#saveBackup').onclick = () => { try { downloadSave(store.exportBackup(), 'ember-backup.json'); } catch (e) { message.textContent = 'Backup storage is unavailable.'; } };
+      const choices = wrap.querySelector('#recoveryCopy');
+      try {
+        for (const key of store.recoveryCopies()) { const option = document.createElement('option'); option.value = key; option.textContent = key; choices.appendChild(option); }
+      } catch (e) { message.textContent += ' Recovery storage is unavailable.'; }
+      wrap.querySelector('#saveCopy').onclick = () => { try { downloadSave(store.exportRecovery(choices.value), 'ember-recovery.json'); } catch (e) { message.textContent = 'Recovery copy is unavailable.'; } };
+      wrap.querySelector('#saveRetry').onclick = () => { store.save(true); show(); };
+      wrap.querySelector('#saveAccept').onclick = () => {
+        sheet({ title: 'Use recovered progress?', body: '<p>The damaged hand or invalid fields will be excluded. Review an exported copy first. The original save will stay in recovery storage.</p>', actions: [{ label: 'Keep reviewing' }, { label: 'Save recovered progress', primary: true, onClick: () => { store.acceptRecovery(); show(); } }] });
+      };
+      wrap.querySelector('#saveImport').onchange = async e => {
+        const file = e.target.files[0]; if (!file) return;
+        try {
+          if (file.size > 5 * 1024 * 1024) throw Error('Save file is too large (maximum 5 MB).');
+          const raw = await file.text(), next = store.inspectImport(raw);
+          sheet({ title: 'Replace current progress?', body: `<p>This save has ${esc(n(next.embers))} Ember and ${esc(n(next.stats.wins))} wins. Your current stored and in-memory progress will be retained as recovery copies. Import replaces progress; it does not merge rewards.</p>`, actions: [{ label: 'Keep current progress' }, { label: 'Import this save', primary: true, onClick: () => {
+            if (store.importSave(raw)) { if (ES.Board) ES.Board.pause(true); close(); applySettings(); go('home'); toast('Save imported. Previous copies retained.'); }
+            else show();
+          } }] });
+        } catch (error) { message.textContent = 'Import rejected: ' + error.message; }
+        e.target.value = '';
+      };
+    } });
+  }
+  function mountSaveStatus() {
+    const banner = document.createElement('div'); banner.className = 'save-status'; banner.hidden = true;
+    const message = document.createElement('span'); message.setAttribute('role', 'status'); message.setAttribute('aria-live', 'polite');
+    const action = document.createElement('button'); action.className = 'btn'; action.textContent = 'Save Recovery'; action.onclick = saveRecovery;
+    banner.append(message, action); document.getElementById('app').appendChild(banner);
+    const update = () => {
+      const state = ES.Store.persistence;
+      banner.hidden = !state.unsaved || state.code === 'pending';
+      message.textContent = state.message;
+    };
+    ES.Store.on(evt => { if (evt.type === 'persistence') update(); });
+    update();
+  }
+
   /* global delegated navigation */
   document.addEventListener('click', e => {
     const g = e.target.closest('[data-go]');
@@ -167,6 +234,6 @@
     if (b) { ES.Audio.play('ui'); back(); }
   });
 
-  Object.assign(UI, { $, $$, esc, n, dur, clock, date, go, back, render, toast, sheet, header, molten, levelBadge, artifactStage, wireHeat, animateHeat, hydrateIcons, applySettings, setEnv, I });
+  Object.assign(UI, { saveRecovery, mountSaveStatus, $, $$, esc, n, dur, clock, date, go, back, render, toast, sheet, header, molten, levelBadge, artifactStage, wireHeat, animateHeat, hydrateIcons, applySettings, setEnv, I });
   ES.UI = UI;
 })(typeof window !== 'undefined' ? window : globalThis);

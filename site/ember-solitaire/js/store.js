@@ -56,44 +56,281 @@
     };
   }
 
-  let S = fresh();
-  const listeners = new Set();
+  // Save boundaries are deliberately separate from engine rules and reward accounting.
+  const RECOVERY_PREFIX = KEY + '.recovery.';
+  const BACKUP_KEY = KEY + '.backup';
+  const object = v => v !== null && typeof v === 'object' && !Array.isArray(v);
+  const number = v => typeof v === 'number' && Number.isFinite(v) && v >= 0 && v <= Number.MAX_SAFE_INTEGER;
+  const integer = v => number(v) && Number.isSafeInteger(v);
+  const boolean = v => typeof v === 'boolean';
+  const text = v => typeof v === 'string' && v.length <= 200;
+  const dateKey = v => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) && !Number.isNaN(Date.parse(v)) && new Date(v).toISOString().slice(0, 10) === v;
+  const artifact = v => ES.Artifacts.LIST.some(a => a.id === v);
+  const own = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
+  const clone = v => JSON.parse(JSON.stringify(v));
 
-  function load() {
-    try {
-      const raw = root.localStorage && root.localStorage.getItem(KEY);
-      if (raw) {
-        const d = JSON.parse(raw), def = fresh();
-        S = Object.assign(fresh(), d);
-        S.stats = Object.assign(def.stats, d.stats || {});
-        S.stats.bySuits = Object.assign(fresh().stats.bySuits, (d.stats || {}).bySuits || {});
-        S.settings = Object.assign(def.settings, d.settings || {});
-        S.ftue = Object.assign(def.ftue, d.ftue || {});
-        ['progress', 'completed', 'daily', 'seen'].forEach(k => { if (!S[k] || typeof S[k] !== 'object') S[k] = {}; });
-        S.ads = Object.assign(def.ads, d.ads || {});
-        if (!S.firstArtifact && (d.progress && Object.keys(d.progress).length)) S.firstArtifact = Object.keys(S.completed)[0] || S.artifact;
-        if (!ES.Manifest.backs[S.settings.cardBack]) S.settings.cardBack = 'spade';
-        if (!ES.Manifest.tables[S.settings.table]) S.settings.table = 'iron';
+  function validateHand(g) {
+    const fail = () => { throw Error('Invalid or inconsistent saved hand'); };
+    if (!object(g) || ![1, 2, 4].includes(g.suits)) fail();
+    const deck = new Map(ES.Engine.newDeck(g.suits, () => 0).map(c => [c.id, c]));
+    function position(p) {
+      if (!object(p) || !Array.isArray(p.cols) || p.cols.length !== 10 || !Array.isArray(p.stock) || p.stock.length > 50 || p.stock.length % 10 || !integer(p.completed) || p.completed > 8 || !integer(p.moves)) fail();
+      const ids = new Set(), counts = {};
+      function card(c, stock) {
+        if (!object(c) || !boolean(c.up)) fail();
+        const expected = deck.get(c.id);
+        if (!expected || expected.rank !== c.rank || expected.suit !== c.suit || ids.has(c.id) || (stock && c.up)) fail();
+        ids.add(c.id);
+        const key = c.suit + c.rank; counts[key] = (counts[key] || 0) + 1;
       }
-    } catch (e) { S = fresh(); }
+      for (const col of p.cols) {
+        if (!Array.isArray(col) || col.length > 104) fail();
+        let faceUp = false;
+        for (const c of col) { card(c, false); if (faceUp && !c.up) fail(); faceUp = faceUp || c.up; }
+        if (col.length && !col[col.length - 1].up) fail();
+      }
+      p.stock.forEach(c => card(c, true));
+      if (ids.size + p.completed * 13 !== 104) fail();
+      let removed = 0;
+      for (const suit of ['S', 'H', 'D', 'C'].slice(0, g.suits)) {
+        const missing = 8 / g.suits - (counts[suit + '1'] || 0);
+        if (missing < 0) fail();
+        for (let rank = 1; rank <= 13; rank++) if (8 / g.suits - (counts[suit + rank] || 0) !== missing) fail();
+        removed += missing;
+      }
+      if (removed !== p.completed) fail();
+      return new Map([...p.cols.flat(), ...p.stock].map(c => [c.id, c.up]));
+    }
+    position(g);
+    for (const key of ['cardsMoved', 'hintsUsed', 'undosUsed', 'startedAt']) if (!integer(g[key])) fail();
+    if (!number(g.elapsed) || !integer(g.bestCompleted) || g.bestCompleted < g.completed || g.bestCompleted > 8 || !boolean(g.won) || g.won !== (g.completed === 8) || !boolean(g.daily)) fail();
+    if (g.seed !== null && (!integer(g.seed) || g.seed > 0xffffffff)) fail();
+    if (g.daily ? !dateKey(g.dailyKey) : g.dailyKey !== null) fail();
+    if (own(g, 'run') && !integer(g.run)) fail();
+    if (own(g, 'tutorial') && !boolean(g.tutorial)) fail();
+    if (!Array.isArray(g.history) || g.history.length > 60 || g.history.length > g.moves) fail();
+    let previous = null, previousCards = null;
+    for (const p of [...g.history, g]) {
+      const cards = position(p);
+      if (previousCards) for (const [id, up] of cards) if (!previousCards.has(id) || (previousCards.get(id) && !up)) fail();
+      previousCards = cards;
+      if (p.completed > g.bestCompleted) fail();
+      if (previous && (p.moves !== previous.moves + 1 || p.completed < previous.completed || p.stock.length > previous.stock.length || previous.stock.length - p.stock.length > 10)) fail();
+      previous = p;
+    }
+    if (own(g, 'initial')) {
+      position(Object.assign({}, g.initial, { completed: 0, moves: 0 }));
+      if (g.initial.stock.length !== 50 || g.initial.cols.some((c, i) => c.length !== (i < 4 ? 6 : 5) || c.some((x, n) => x.up !== (n === c.length - 1)))) fail();
+    }
+    return true;
+  }
+
+  // Missing optional v2 fields retain the historic defaults. Invalid fields are
+  // never coerced/clamped into invented earnings; recovery requires consent.
+  function validateProfile(data) {
+    if (!object(data) || data.v !== 2) throw Error('Unsupported save version');
+    const result = fresh(), issues = [];
+    const issue = p => issues.push(p);
+    function fields(input, output, spec, path) {
+      if (!object(input)) { issue(path); return; }
+      for (const [k, check] of Object.entries(spec)) if (own(input, k)) {
+        if (check(input[k])) output[k] = clone(input[k]); else issue(path + '.' + k);
+      }
+    }
+    fields(data, result, { embers: integer, totalEmber: integer, forgeLevel: v => integer(v) && v >= 1, reserve: integer, artifact, firstArtifact: v => v === null || artifact(v), savedAt: integer }, 'profile');
+    for (const key of ['stats', 'settings', 'ftue', 'ads']) {
+      if (!own(data, key)) continue;
+      const spec = {};
+      for (const [k, value] of Object.entries(result[key])) {
+        if (k === 'bySuits') continue;
+        spec[k] = typeof value === 'boolean' ? boolean : typeof value === 'string' ? text : value === null ? v => v === null || number(v) : (k === 'playMs' ? number : integer);
+      }
+      if (key === 'stats') spec.lowestMoves = v => v === null || integer(v);
+      if (key === 'settings') Object.assign(spec, { music: v => number(v) && v <= 1, sfx: v => number(v) && v <= 1, cardBack: v => own(ES.Manifest.backs, v), table: v => own(ES.Manifest.tables, v) });
+      fields(data[key], result[key], spec, key);
+      if (key === 'stats' && object(data.stats) && own(data.stats, 'bySuits')) {
+        if (!object(data.stats.bySuits)) issue('stats.bySuits');
+        else for (const k of [1, 2, 4]) if (own(data.stats.bySuits, k)) fields(data.stats.bySuits[k], result.stats.bySuits[k], { games: integer, wins: integer }, 'stats.bySuits.' + k);
+      }
+    }
+    const maps = {
+      progress: { key: artifact, spec: { tier: v => integer(v) && v <= 6, heat: integer, started: integer, ember: integer, victories: integer } },
+      completed: { key: artifact, spec: { name: text, date: integer, victories: integer, ember: integer, forgingMs: number } },
+      daily: { key: dateKey, spec: { sets: v => integer(v) && v <= 8, rewarded: boolean, perfect: boolean } }
+    };
+    for (const [key, rule] of Object.entries(maps)) if (own(data, key)) {
+      if (!object(data[key])) { issue(key); continue; }
+      for (const [id, value] of Object.entries(data[key])) {
+        // Progress/records are atomic: partial records cannot drive forge UI.
+        const required = Object.keys(rule.spec).filter(k => key !== 'daily' || k !== 'perfect');
+        if (!rule.key(id) || !object(value) || required.some(k => !own(value, k)) || Object.entries(rule.spec).some(([k, check]) => own(value, k) && !check(value[k]))) { issue(key + '.' + id); continue; }
+        result[key][id] = Object.fromEntries(Object.keys(rule.spec).filter(k => own(value, k)).map(k => [k, value[k]]));
+      }
+    }
+    if (own(data, 'seen')) {
+      if (!object(data.seen)) issue('seen');
+      else for (const [k, v] of Object.entries(data.seen)) {
+        const parts = k.split(':');
+        if (artifact(parts[0]) && /^[1-6]$/.test(parts[1]) && parts.length === 2 && boolean(v)) result.seen[k] = v; else issue('seen.' + k);
+      }
+    }
+    if (!result.firstArtifact && Object.keys(result.progress).length) result.firstArtifact = Object.keys(result.completed)[0] || result.artifact;
+    if (own(data, 'game') && data.game !== null) {
+      try { validateHand(data.game); result.game = clone(data.game); }
+      catch (e) { issue('game'); }
+    }
+    return { profile: result, issues };
+  }
+
+  let S = fresh(), saveT = null, originalRaw = null, lastGoodRaw = null;
+  let blocked = true, recoverable = false, recoveryKey = null;
+  const listeners = new Set();
+  let persistence = { code: 'ready', unsaved: false, message: '', blocked: false };
+  function status(code, message, unsaved = true) {
+    persistence = { code, message, unsaved, blocked, recoveryKey };
+    emit({ type: 'persistence', status: Object.assign({}, persistence) });
+  }
+  function storage() {
+    const store = root.localStorage;
+    if (!store || typeof store.getItem !== 'function' || typeof store.setItem !== 'function') throw Error('Storage unavailable');
+    return store;
+  }
+  function quarantine(raw) {
+    if (raw === null) return null;
+    const store = storage();
+    let suffix = 0, key;
+    do { key = RECOVERY_PREFIX + Date.now() + '.' + suffix++; } while (store.getItem(key) !== null);
+    store.setItem(key, raw);
+    if (store.getItem(key) !== raw) throw Error('Recovery copy could not be verified');
+    return key;
+  }
+  function load() {
+    clearTimeout(saveT);
+    S = fresh(); blocked = true; recoverable = false; recoveryKey = null; originalRaw = null; lastGoodRaw = null;
+    try {
+      originalRaw = storage().getItem(KEY);
+      if (originalRaw === null) { blocked = false; status('ready', '', false); }
+      else {
+        let checked;
+        try { checked = validateProfile(JSON.parse(originalRaw)); }
+        catch (e) {
+          try { recoveryKey = quarantine(originalRaw); } catch (copyError) { /* original remains protected */ }
+          status('protected', 'Save could not be loaded or uses an unsupported version. Original save protected. Export it before recovery.');
+        }
+        if (checked) {
+          if (checked.issues.length) {
+            try { recoveryKey = quarantine(originalRaw); } catch (copyError) { /* replacement stays blocked */ }
+            S = checked.profile; recoverable = true;
+            status('recovery', 'Save needs recovery. Valid progress is available; the damaged hand or fields were excluded. Export the original and review Save Recovery.');
+          } else {
+            S = checked.profile; lastGoodRaw = originalRaw; blocked = false;
+            status('saved', '', false);
+          }
+        }
+      }
+    } catch (e) { status('unavailable', 'Saved progress cannot be read. Saving is blocked to protect it. Export this session before leaving.'); }
     ensureProgress(S.artifact);
     return S;
   }
-  let saveT = null;
+  function snapshot() {
+    const copy = Object.assign({}, S, { savedAt: Date.now() });
+    if (S.game) copy.game = Object.assign({}, S.game, { history: S.game.history.slice(-20) });
+    return copy;
+  }
+  function writeProfile(profile) {
+    const checked = validateProfile(profile);
+    if (checked.issues.length) throw Error('Current progress failed validation: ' + checked.issues.join(', '));
+    const json = JSON.stringify(profile), store = storage();
+    // Fail closed if the prior valid save cannot be backed up. Never clear data
+    // to free quota, and never mark a failed write as saved.
+    if (lastGoodRaw !== null) store.setItem(BACKUP_KEY, lastGoodRaw);
+    store.setItem(KEY, json);
+    lastGoodRaw = json;
+    S.savedAt = profile.savedAt;
+    status('saved', '', false);
+    // Optional native mirror is not the web durability acknowledgement.
+    try { if (ES.Platform) ES.Platform.persist(KEY, json); } catch (e) { /* local write succeeded */ }
+    return true;
+  }
   function save(now) {
     clearTimeout(saveT);
+    if (blocked) { status(persistence.code, persistence.message); return false; }
     const run = () => {
-      try {
-        S.savedAt = Date.now();
-        const copy = Object.assign({}, S);
-        if (S.game) { copy.game = Object.assign({}, S.game, { history: S.game.history.slice(-20) }); }
-        const json = JSON.stringify(copy);
-        root.localStorage && root.localStorage.setItem(KEY, json);
-        ES.Platform && ES.Platform.persist(KEY, json);
-      } catch (e) { /* storage unavailable: play continues in memory */ }
+      try { return writeProfile(snapshot()); }
+      catch (e) { status('unsaved', 'Progress is not saved. Storage may be full or unavailable, or progress failed validation. Retry or export before leaving.'); return false; }
     };
-    if (now) run(); else saveT = setTimeout(run, 250);
+    if (now) return run();
+    if (persistence.code !== 'unsaved') status('pending', 'Saving progress…');
+    saveT = setTimeout(run, 250);
+    return true;
   }
+  function acceptRecovery() {
+    if (!recoverable || originalRaw === null) return false;
+    try {
+      if (!recoveryKey) recoveryKey = quarantine(originalRaw);
+      const profile = snapshot(), checked = validateProfile(profile);
+      if (checked.issues.length) throw Error('Recovery is invalid');
+      const store = storage(), json = JSON.stringify(profile);
+      store.setItem(KEY, json);
+      blocked = false; recoverable = false; lastGoodRaw = json; S.savedAt = profile.savedAt;
+      status('saved', 'Recovered progress saved. Original recovery copy retained.', false);
+      return true;
+    } catch (e) { status('recovery', 'Recovery could not be saved. The original is still protected. Export before leaving.'); return false; }
+  }
+  function exportSave() {
+    const profile = snapshot(), checked = validateProfile(profile);
+    if (checked.issues.length) throw Error('Current progress is invalid; export the original recovery copy instead.');
+    return JSON.stringify(profile, null, 2);
+  }
+  function exportOriginal() { return originalRaw; }
+  function exportBackup() { return storage().getItem(BACKUP_KEY); }
+  function recoveryCopies() {
+    const store = storage(), keys = [];
+    for (let i = 0; i < store.length; i++) { const key = store.key(i); if (key && key.startsWith(RECOVERY_PREFIX)) keys.push(key); }
+    return keys.sort().reverse();
+  }
+  function exportRecovery(key) {
+    if (typeof key !== 'string' || !key.startsWith(RECOVERY_PREFIX)) throw Error('Invalid recovery key');
+    return storage().getItem(key);
+  }
+  function inspectImport(raw) {
+    const checked = validateProfile(JSON.parse(raw));
+    if (checked.issues.length) throw Error('Invalid save: ' + checked.issues.join(', '));
+    return checked.profile;
+  }
+  // Called only after explicit replacement confirmation. Both current memory and
+  // stored original are archived first; a failed step leaves active state intact.
+  function importSave(raw) {
+    clearTimeout(saveT);
+    try {
+      const next = inspectImport(raw), store = storage();
+      const existing = store.getItem(KEY);
+      quarantine(existing);
+      quarantine(JSON.stringify(snapshot()));
+      const json = JSON.stringify(next);
+      store.setItem(KEY, json);
+      S = next; ensureProgress(S.artifact); originalRaw = existing;
+      blocked = false; recoverable = false; lastGoodRaw = json;
+      status('saved', 'Imported save. Previous progress retained in recovery storage.', false);
+      emit({ type: 'import' });
+      return true;
+    } catch (e) { status(blocked ? persistence.code : 'unsaved', 'Import failed. Current progress was kept. Check the file or export before leaving.'); return false; }
+  }
+  function reset() {
+    clearTimeout(saveT);
+    if (blocked) { status(persistence.code, 'Reset blocked while a save needs recovery. Export and resolve recovery first.'); return false; }
+    try {
+      const store = storage();
+      quarantine(store.getItem(KEY));
+      quarantine(JSON.stringify(snapshot()));
+      const next = fresh();
+      next.progress[next.artifact] = { tier: 0, heat: 0, started: Date.now(), ember: 0, victories: 0 };
+      store.setItem(KEY, JSON.stringify(next));
+      S = next; lastGoodRaw = JSON.stringify(next); status('saved', '', false); emit({ type: 'reset' });
+      return true;
+    } catch (e) { status('unsaved', 'Reset could not be saved. Existing progress was kept. Export before leaving.'); return false; }
+  }
+
   function emit(evt) { listeners.forEach(fn => { try { fn(evt); } catch (e) { console.error(e); } }); }
   function on(fn) { listeners.add(fn); return () => listeners.delete(fn); }
 
@@ -230,9 +467,10 @@
 
   ES.Store = {
     KEY, HEAT_PER_TIER, LEVEL_EMBER, WIN_REWARD, SET_REWARD, DAILY_REWARD, DAILY_GOAL_SETS, MODES,
-    get state() { return S; }, load, save, on, emit, today,
+    get state() { return S; }, get canRecover() { return recoverable; }, get persistence() { return Object.assign({}, persistence); }, load, save, on, emit, today,
+    validateHand, validateProfile, recoveryCopies, exportRecovery, acceptRecovery, exportSave, exportOriginal, exportBackup, inspectImport, importSave, RECOVERY_PREFIX, BACKUP_KEY,
     current, heatPct, ready, cost, costFor, pctFor, levelProgress, addEmber, strike, selectArtifact, artifactState,
     startGame, abandonGame, applyResult, tick, favoriteSuits, dailyFor, dailySeed,
-    reset() { S = fresh(); ensureProgress(S.artifact); save(true); emit({ type: 'reset' }); }
+    reset
   };
 })(typeof window !== 'undefined' ? window : globalThis);

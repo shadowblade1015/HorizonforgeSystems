@@ -11,7 +11,7 @@ test('F02: undo/replay must award only one victory per hand', { todo: 'Known def
   assert.deepEqual({ wins: S.state.stats.wins, embers: S.state.embers }, { wins: 1, embers: 85 });
 });
 
-test('F01: malformed hand must not be accepted as an active game', { todo: 'Known defect F01; profile recovery is a later application phase' }, () => {
+test('F01: malformed hand must not be accepted as an active game', () => {
   const { S } = harness(readFileSync(new URL('./fixtures/corrupt-v2.json', import.meta.url), 'utf8')); S.load();
   assert.equal(S.state.embers, 321);
   assert.equal(S.state.game, null, 'Recover the profile while rejecting the malformed hand');

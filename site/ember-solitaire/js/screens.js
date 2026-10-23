@@ -430,6 +430,7 @@
         </div>
         <div class="panel set-group">
           ${nav('setTutorial', 'Replay Tutorial', '', 'hint')}
+          ${nav('setSaveRecovery', 'Save Recovery', 'Export / import', 'shield')}
           ${nav('setReset', 'Reset Progress', '', 'restart')}
         </div>
       </div>`;
@@ -443,7 +444,8 @@
     $('#setPrivacy').onclick = () => ES.Platform.openUrl(ES.Build.privacyUrl);
     $('#setAbout').onclick = () => UI.sheet({ kicker: 'A Horizon Forge Game', title: 'Ember Solitaire', body: `<img class="about-emblem" src="${M.branding.emblemSmall}" alt=""><p class="center small muted">Version ${ES.Build.version} (${ES.Build.versionCode})<br>Support: <a href="mailto:${esc(ES.Build.supportEmail)}">${esc(ES.Build.supportEmail)}</a><br>Classic Spider Solitaire inside an ancient forge.<br>Every hand feeds the flame.</p><p class="center small muted">Keyboard: ← → choose a column · Enter pick up / place · ↑ ↓ adjust run · D deal · U undo · H hint</p>` });
     $('#setTutorial').onclick = () => { S().ftue.tutorial = false; St().save(); ES.Tutorial.start(); };
-    $('#setReset').onclick = () => UI.sheet({ title: 'Reset Progress?', body: '<p class="center small muted">All Ember, artifacts, statistics and the hand in progress will be erased. This cannot be undone.</p>', actions: [{ label: 'Keep my progress', primary: true }, { label: 'Erase everything', ghost: true, onClick: () => { St().reset(); UI.applySettings(); UI.toast('Progress reset.'); UI.go('home'); } }] });
+    $('#setSaveRecovery').onclick = UI.saveRecovery;
+    $('#setReset').onclick = () => UI.sheet({ title: 'Reset Progress?', body: '<p class="center small muted">All Ember, artifacts, statistics and the hand in progress will be erased. Recovery copies will be kept on this device.</p>', actions: [{ label: 'Keep my progress', primary: true }, { label: 'Erase everything', ghost: true, onClick: () => { if (!St().reset()) { UI.saveRecovery(); return; } UI.applySettings(); UI.toast('Progress reset.'); UI.go('home'); } }] });
   };
   function chooser(title, map, key, thumb) {
     const s = S().settings;

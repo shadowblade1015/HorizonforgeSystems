@@ -153,3 +153,39 @@
 .a11y-cols { position: absolute; inset: 0; pointer-events: none; z-index: 1; }
 .a11y-col { position: absolute; left: 0; top: 0; opacity: 0; pointer-events: none; background: none; border: 0; }
 .a11y-col:focus-visible { opacity: 1; outline: 2px solid var(--white-heat); outline-offset: 2px; border-radius: 6px; }
+
+/* Reachable tableau: native pan by default; deliberate touch dragging is opt-in. */
+.table { overflow: auto; scrollbar-width: thin; overscroll-behavior: contain; }
+.table::-webkit-scrollbar { display: block; width: 8px; height: 8px; }
+.table::-webkit-scrollbar-thumb { background: #a8743f; border-radius: 8px; }
+.board { touch-action: pan-x pan-y pinch-zoom; }
+.board.touch-drag { touch-action: none; }
+.board-help { position: relative; display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 2px 12px; width: 100%; max-width: 1180px; align-self: center; font-size: .8rem; }
+.board-help button, .board-help summary { min-height: 44px; padding: 10px; border: 1px solid var(--line-strong); border-radius: 6px; color: var(--text); background: #15191d; cursor: pointer; }
+.board-help button[aria-pressed="true"] { border: 2px solid var(--molten-gold); }
+.board-help details[open] { width: 100%; }
+.board-help p { line-height: 1.5; margin: 8px 0; }
+.a11y-cols { z-index: 20; }
+.a11y-col { opacity: 1; pointer-events: auto; color: var(--warm-ivory); background: #15191d; border: 1px solid var(--line-strong); border-radius: 6px; font-size: 1rem; }
+.a11y-col[aria-pressed="true"] { border: 3px double var(--white-heat); }
+.col-hl.target { border: 2px dashed var(--molten-gold); }
+.card.sel { outline: 2px solid var(--white-heat); outline-offset: -3px; }
+.game-top > *, .game-bottom > * { min-width: 0; }
+.game-title { overflow-wrap: anywhere; }
+@media (max-width: 380px) { .game-top { gap: 4px; padding-inline: 8px; } .gstat { min-width: 45px; padding-inline: 4px; } .game-title .display { font-size: 14px; } .game-bottom { padding-inline: 8px; } }
+@media (orientation: landscape) and (max-height: 520px) {
+ #scr-game > .fg.game { grid-template-rows: auto auto auto minmax(0, 1fr); }
+ .board-help { grid-column: 1 / 3; grid-row: 3; }
+ .table, .game-bottom { grid-row: 4; }
+}
+:root[data-reduced="1"] .board *, :root[data-reduced="1"] .pip, :root[data-reduced="1"] .stock { animation: none !important; }
+@media (prefers-reduced-motion: reduce) { .board *, .pip, .stock { animation: none !important; } }
+
+.a11y-cols { position: sticky; top: 0; inset-inline: auto; height: 44px; background: #15191d; }
+
+.board-scroll-tip { font-size: .8rem; color: var(--warm-ivory); }
+@media (min-width: 700px) { .board-scroll-tip { display: none; } }
+
+.run-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; width: 100%; }
+.run-controls[hidden] { display: none; }
+.run-controls > span { flex-basis: 100%; }

@@ -150,23 +150,24 @@
   /* ---------- helpers ------------------------------------------------------ */
   const motion = () => ES.FX.motion();
   const faceUrl = c => ES.Manifest.card(c.rank, c.suit);
-  function announce(msg) { const l = $('#gLive'); if (l) { l.textContent = ''; later(() => (l.textContent = msg), 30); } }
+  function announce(msg) { const l = $('#gLive'); if (l) { cancelLater(B.liveTimer); l.textContent = ''; B.liveTimer = later(() => (l.textContent = msg), 30); } }
   function fmtTime(ms) { const s = Math.floor(ms / 1000); return String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0'); }
 
   /* ---------- layout ------------------------------------------------------- */
   function computeLayout() {
-    const g = B.g, W = B.el.clientWidth, Hvis = B.table.clientHeight;
+    const g = B.g, Hvis = B.table.clientHeight;
+    const minimum = ES.Store.state.settings.largeCards ? 64 : 48;
+    const W = Math.max(B.table.clientWidth, minimum * 10 + 9 * 6 + 12);
     const large = ES.Store.state.settings.largeCards;
     const padX = Math.max(3, Math.round(W * 0.01));
     const gap = Math.max(large ? 2 : 3, Math.min(10, Math.round(W * 0.008)));
     const colW = (W - padX * 2 - gap * 9) / 10;
     const maxW = large ? 150 : 124;
-    let cw = Math.min(colW, maxW, (Hvis * 0.3) / 1.4);
-    cw = Math.max(26, cw);
+    const cw = Math.max(minimum, Math.min(colW, maxW));
     const ch = cw * 1.4;
     const extra = colW - cw;
     const idxH = large ? Math.max(20, cw * 0.4) : Math.max(15, cw * 0.33);
-    const padT = 6;
+    const padT = 50;
     const avail = Math.max(ch * 2, Hvis - padT - ch - 10);
     const cols = [];
     let maxBottom = 0;
@@ -184,35 +185,36 @@
       maxBottom = Math.max(maxBottom, bottom);
       cols.push({ x, items, fu, fd, top: items.length ? items[items.length - 1].y : padT });
     }
-    return { W, cw, ch, colW, gap, padX, padT, cols, height: Math.max(Hvis, maxBottom + 12), idxH };
+    return { W, cw, ch, colW, gap, padX, padT, cols, viewportHeight: Hvis, height: Math.max(Hvis, maxBottom + 12), idxH };
   }
 
-  /* Screen-reader column controls (TalkBack / VoiceOver): one invisible button per column,
-     laid over the column so explore-by-touch finds it. Double-tap picks up the movable run,
-     double-tap another column places it. Cards themselves stay out of the accessibility tree. */
+  /* Visible column buttons select a movable run or place selected cards.
+     Cards themselves stay out of the accessibility tree. */
   function a11yColumns() {
-    const g = B.g, L = B.L; if (!B.a11y || !g) return;
+    const g = B.g, L = B.L; if (!B.a11y || !g || !L) return;
+    runControls();
     for (let c = 0; c < 10; c++) {
       const b = B.a11y[c], col = g.cols[c], top = col[col.length - 1];
       b.style.transform = `translate3d(${L.cols[c].x}px, 0, 0)`;
-      b.style.width = L.cw + 'px'; b.style.height = Math.max(L.ch, L.cols[c].top + L.ch) + 'px';
+      b.style.width = L.cw + 'px'; b.style.height = '44px';
+      b.textContent = String(c + 1); b.setAttribute('aria-pressed', String(!!B.sel && B.sel.col === c));
       const down = col.filter(x => !x.up).length;
       let i = col.length - 1; while (i > 0 && E().movable(col, i - 1)) i--;
       const run = col.length ? col.length - i : 0;
       let label = `Column ${c + 1}. `;
       label += col.length ? `${E().cardName(top)} on top` + (run > 1 ? `, run of ${run} from ${E().cardName(col[i])}` : '') + (down ? `, ${down} face down` : '') + '.' : 'Empty.';
-      if (B.sel && B.sel.col === c) label += ' Selected. Double-tap to cancel.';
-      else if (B.sel) label += E().canMove(g, B.sel.col, B.sel.idx, c) ? ' Double-tap to place the selected cards here.' : ' Selected cards cannot go here.';
-      else if (col.length && top.up) label += ' Double-tap to pick up.';
+      if (B.sel && B.sel.col === c) label += ' Selected. Activate to cancel.';
+      else if (B.sel) label += E().canMove(g, B.sel.col, B.sel.idx, c) ? ' Activate to place the selected cards here.' : ' Selected cards cannot go here.';
+      else if (col.length && top.up) label += ' Activate to pick up.';
       b.setAttribute('aria-label', label);
     }
   }
   function a11yActivate(c) {
-    const g = B.g; if (!g) return;
+    const g = B.g; if (!g || ES.UI.hasModal?.() || !action()) return;
     if (B.sel) { if (B.sel.col === c) { select(null); announce('Selection cancelled.'); } else tapColumn(c); a11yColumns(); return; }
     const col = g.cols[c]; if (!col.length) { announce('Empty column.'); return; }
     let i = col.length - 1; while (i > 0 && E().movable(col, i - 1)) i--;
-    tapCard(c, i); a11yColumns();
+    select(c, i); announce(`Selected ${col.length - i} cards from ${E().cardName(col[i])}. Choose a destination or Escape to cancel.`);
   }
 
   function applyLayoutVars() {
@@ -220,6 +222,7 @@
     B.el.style.setProperty('--cw', L.cw + 'px');
     B.el.style.setProperty('--chh', L.ch + 'px');
     B.el.style.height = L.height + 'px';
+    B.el.style.width = L.W + 'px';
     B.el.classList.toggle('small-cards', L.cw < 84);
     // empty-slot + highlight markers
     for (let c = 0; c < 10; c++) {
@@ -522,7 +525,7 @@
     B.sel = null;
     ES.Audio.play('place'); ES.Audio.haptic(10);
     if (!afterAction(res, { type: 'move', moved: res.moved, to, fromDrag: opts.fromDrag })) return true;
-    announce(`Moved ${res.moved.length > 1 ? res.moved.length + ' cards' : 'card'} to column ${to + 1}.`);
+    announce(res.won ? 'Victory. All eight sequences completed.' : res.newSets ? `Sequence completed. ${g.completed} of eight sets forged.` : `Moved ${res.moved.length > 1 ? res.moved.length + ' cards' : 'card'} to column ${to + 1}.`);
     return true;
   }
   function doDeal() {
@@ -539,7 +542,7 @@
     const res = E().deal(g);
     ES.Audio.haptic(14);
     if (!afterAction(res, { type: 'deal', dealt: res.dealt })) return;
-    announce('Dealt ten cards.');
+    announce(res.won ? 'Victory. All eight sequences completed.' : res.newSets ? `Dealt ten cards. Sequence completed. ${g.completed} of eight sets forged.` : 'Dealt ten cards.');
   }
   function doUndo() {
     const g = B.g; if (!action(true) || B.drag) return;
@@ -588,6 +591,34 @@
     B.sel = col == null ? null : { col, idx };
     B.els.forEach(d => { const c = +d.dataset.col, i = +d.dataset.idx; d.classList.toggle('sel', !!(B.sel && c === B.sel.col && i >= B.sel.idx)); });
     B.hls.forEach((h, c) => h.classList.toggle('target', !!(B.sel && E().canMove(B.g, B.sel.col, B.sel.idx, c))));
+    a11yColumns();
+    if (B.L && B.table.clientHeight !== B.L.viewportHeight) render({ type: 'none' });
+    if (B.sel) reveal(col, idx);
+  }
+  function runControls() {
+    const controls = $('#runControls'); if (!controls) return;
+    // Keep the table origin stable while lifting a previously selected run.
+    if (!B.sel && B.drag?.started) return;
+    controls.hidden = !B.sel;
+    if (!B.sel || !B.g) return;
+    const { col, idx } = B.sel, cards = B.g.cols[col];
+    $('#runSummary').textContent = (cards.length - idx) + ' selected from ' + E().cardName(cards[idx]);
+    $('#btnRunMore').disabled = idx === 0 || !E().movable(cards, idx - 1);
+    $('#btnRunLess').disabled = idx === cards.length - 1;
+  }
+  function adjustRun(delta) {
+    if (ES.UI.hasModal?.() || !action() || !B.sel) return;
+    const { col, idx } = B.sel, cards = B.g.cols[col], next = idx + delta;
+    if (next < 0 || next >= cards.length || !E().movable(cards, next)) return;
+    select(col, next); announce('Selected ' + (cards.length - next) + ' cards from ' + E().cardName(cards[next]) + '.');
+  }
+  function reveal(col, idx) {
+    if (!B.L) return;
+    const p = B.L.cols[col].items[idx] || { x: B.L.cols[col].x, y: 0 }, t = B.table;
+    if (p.x < (t.scrollLeft || 0)) t.scrollLeft = Math.max(0, p.x - 8);
+    else if (p.x + B.L.cw > (t.scrollLeft || 0) + t.clientWidth) t.scrollLeft = p.x + B.L.cw - t.clientWidth + 8;
+    if (p.y < t.scrollTop) t.scrollTop = Math.max(0, p.y - 8);
+    else if (p.y + B.L.ch > t.scrollTop + t.clientHeight) t.scrollTop = p.y + Math.min(B.L.ch, t.clientHeight) - t.clientHeight + 8;
   }
   function smartMove(col, idx, quiet) {
     if (!action()) return false;
@@ -621,6 +652,7 @@
   }
   function rejectAt(col, idx) {
     ES.Audio.play('invalid'); ES.Audio.haptic([8, 30, 8]);
+    announce('Cannot move those cards there. Choose a legal highlighted column, or cancel selection.');
     const g = B.g; if (!motion()) return;
     for (let i = idx; i < g.cols[col].length; i++) {
       const d = B.els.get(g.cols[col][i].id); if (!d) continue;
@@ -636,7 +668,7 @@
     return bd < L.colW * 0.75 + L.gap ? best : -1;
   }
   function onDown(e) {
-    if (!action() || e.button > 0 || B.drag) return;
+    if (e.isPrimary === false || ES.UI.hasModal?.() || e.target.closest('.a11y-col') || !action() || e.button > 0 || B.drag) return;
     ES.Audio.unlock();
     const br = B.el.getBoundingClientRect();
     const x = e.clientX - br.left, y = e.clientY - br.top;
@@ -644,18 +676,20 @@
     let col, idx;
     if (cardEl && B.els.has(cardEl.dataset.id)) { col = +cardEl.dataset.col; idx = +cardEl.dataset.idx; }
     else { col = colAtX(x); idx = -1; }
-    B.drag = { id: e.pointerId, sx: e.clientX, sy: e.clientY, x0: x, y0: y, col, idx, started: false, els: [], target: -1 };
+    B.drag = { id: e.pointerId, sx: e.clientX, sy: e.clientY, x0: x, y0: y, col, idx, started: false, els: [], target: -1, touch: e.pointerType === 'touch', scrollX: B.table.scrollLeft || 0, scrollY: B.table.scrollTop };
     if (idx >= 0 && B.g.cols[col][idx] && B.g.cols[col][idx].up && E().movable(B.g.cols[col], idx)) {
       B.drag.can = true;
-      try { B.el.setPointerCapture(e.pointerId); } catch (err) {}
+      if (!B.drag.touch || B.touchDrag) { try { B.el.setPointerCapture(e.pointerId); } catch (err) {} }
     }
   }
   let rafMove = 0, lastEv = null;
   function onMove(e) {
-    const D = B.drag; if (!D || D.id !== e.pointerId || !D.can) return;
+    const D = B.drag; if (!D || D.id !== e.pointerId) return;
+    if (D.touch && !B.touchDrag) { if (Math.hypot(e.clientX - D.sx, e.clientY - D.sy) > 10) D.scrolled = true; return; }
+    if (!D.can) { if (Math.hypot(e.clientX - D.sx, e.clientY - D.sy) > 10) D.scrolled = true; return; }
     lastEv = e;
     if (!D.started) {
-      if (Math.hypot(e.clientX - D.sx, e.clientY - D.sy) < 7) return;
+      if (Math.hypot(e.clientX - D.sx, e.clientY - D.sy) < (D.touch ? 12 : 7)) return;
       startDrag();
     }
     e.preventDefault();
@@ -677,7 +711,7 @@
   }
   function dragFrame(e) {
     const D = B.drag; if (!D || !D.started) return;
-    const dx = e.clientX - D.sx, dy = e.clientY - D.sy;
+    const dx = e.clientX - D.sx + (B.table.scrollLeft || 0) - D.scrollX, dy = e.clientY - D.sy + B.table.scrollTop - D.scrollY;
     D.els.forEach(({ d, p }) => { d.style.transform = `translate3d(${p.x + dx}px, ${p.y + dy - 6}px, 0) scale(1.04)`; });
     const lead = D.els[0].p;
     const c = colAtX(lead.x + dx + B.L.cw / 2);
@@ -687,12 +721,20 @@
       if (c >= 0 && D.valid[c] && c !== D.col) B.hls[c].classList.add('over');
     }
     D.dx = dx; D.dy = dy;
+    const r = B.table.getBoundingClientRect();
+    const speed = (v, lo, hi) => v < lo + 32 ? -10 : v > hi - 32 ? 10 : 0;
+    const tx = B.table.scrollLeft || 0, ty = B.table.scrollTop;
+    B.table.scrollLeft = Math.max(0, Math.min(B.L.W - B.table.clientWidth, tx + speed(e.clientX, r.left, r.left + r.width)));
+    B.table.scrollTop = Math.max(0, Math.min(B.L.height - B.table.clientHeight, ty + speed(e.clientY, r.top, r.top + r.height)));
+    if ((tx !== B.table.scrollLeft || ty !== B.table.scrollTop) && !rafMove) rafMove = frame(() => { rafMove = 0; dragFrame(e); });
   }
   function onUp(e) {
     const D = B.drag; if (!D || D.id !== e.pointerId) return;
+    if (D.started) dragFrame(e);
     cancelFrame(rafMove); rafMove = 0; lastEv = null; B.drag = null;
     try { B.el.releasePointerCapture(e.pointerId); } catch (err) {}
     if (!D.started) {
+      if (D.scrolled || Math.abs((B.table.scrollLeft || 0) - D.scrollX) > 2 || Math.abs(B.table.scrollTop - D.scrollY) > 2) return;
       if (D.idx >= 0) tapCard(D.col, D.idx); else if (D.col >= 0) tapColumn(D.col);
       return;
     }
@@ -713,19 +755,20 @@
       place(d, p);
     });
   }
-  function onCancel(e) { if (B.drag && B.drag.id === e.pointerId) { invalidate('pause'); render({ type: 'none' }); } }
+  function onCancel(e) { if (B.drag && B.drag.id === e.pointerId) { if (B.drag.started) { invalidate('pause'); resumeWork(); } else { B.drag = null; B.lastTap = null; } } }
 
   /* ---------- keyboard ---------------------------------------------------- */
   function onKey(e) {
-    if (document.querySelector('.overlay, .ceremony') || !action(true)) return;
+    if (ES.UI.hasModal?.() || !action(true)) return;
     const k = e.key, g = B.g;
-    const cursor = () => { B.kb.active = true; B.hls.forEach((h, c) => h.classList.toggle('kb', c === B.kb.col)); const col = g.cols[B.kb.col]; const top = col[col.length - 1]; announce(`Column ${B.kb.col + 1}: ${col.length ? (top.up ? E().cardName(top) : 'face-down card') + ', ' + col.length + ' cards' : 'empty'}.`); };
+    const cursor = () => { B.a11y[B.kb.col].focus({ preventScroll: true }); reveal(B.kb.col, B.g.cols[B.kb.col].length - 1); B.kb.active = true; B.hls.forEach((h, c) => h.classList.toggle('kb', c === B.kb.col)); const col = g.cols[B.kb.col]; const top = col[col.length - 1]; announce(`Column ${B.kb.col + 1}: ${col.length ? (top.up ? E().cardName(top) : 'face-down card') + ', ' + col.length + ' cards' : 'empty'}.`); };
     if (k === 'ArrowLeft' || k === 'ArrowRight') { B.kb.col = (B.kb.col + (k === 'ArrowLeft' ? 9 : 1)) % 10; cursor(); e.preventDefault(); return; }
     if ((k === 'ArrowUp' || k === 'ArrowDown') && B.sel) {
       const col = g.cols[B.sel.col]; let i = B.sel.idx + (k === 'ArrowUp' ? -1 : 1);
       if (i >= 0 && i < col.length && E().movable(col, i)) { select(B.sel.col, i); announce(`Selected ${col.length - i} cards from ${E().cardName(col[i])}.`); }
       e.preventDefault(); return;
     }
+    if ((k === 'Enter' || k === ' ') && e.target?.closest('.a11y-col')) return;
     if (k === 'Enter' || k === ' ') {
       e.preventDefault();
       if (B.sel && B.sel.col !== B.kb.col) { tapColumn(B.kb.col); return; }
@@ -734,7 +777,7 @@
       if (B.sel && B.sel.col === B.kb.col) { select(null); return; }
       tapCard(B.kb.col, i); return;
     }
-    if (k === 'Escape') { select(null); return; }
+    if (k === 'Escape') { select(null); announce('Selection cancelled.'); return; }
     if (k === 'd' || k === 'D') doDeal();
     else if (k === 'u' || k === 'U' || ((e.ctrlKey || e.metaKey) && (k === 'z' || k === 'Z'))) { e.preventDefault(); doUndo(); }
     else if (k === 'h' || k === 'H') doHint();
@@ -758,21 +801,28 @@
       const h = document.createElement('div'); h.className = 'col-hl'; h.setAttribute('aria-hidden', 'true'); B.el.appendChild(h); B.hls.push(h);
     }
     const ac = document.createElement('div'); ac.className = 'a11y-cols'; ac.setAttribute('role', 'group'); ac.setAttribute('aria-label', 'Columns');
-    B.a11y = Array.from({ length: 10 }, (_, c) => { const b = document.createElement('button'); b.className = 'a11y-col'; b.type = 'button'; b.tabIndex = -1; b.addEventListener('click', () => a11yActivate(c)); ac.appendChild(b); return b; });
-    B.table.appendChild(ac);
+    B.a11y = Array.from({ length: 10 }, (_, c) => { const b = document.createElement('button'); b.className = 'a11y-col'; b.type = 'button'; b.tabIndex = 0; b.addEventListener('focus', () => { B.kb.col = c; if (B.g) reveal(c, B.g.cols[c].length - 1); }); b.addEventListener('click', () => a11yActivate(c)); ac.appendChild(b); return b; });
+    B.el.appendChild(ac);
+    const mode = $('#btnTouchMode');
+    if (mode) mode.addEventListener('click', () => { if (ES.UI.hasModal?.()) return; invalidate('pause'); B.touchDrag = !B.touchDrag; B.el.classList.toggle('touch-drag', B.touchDrag); mode.setAttribute('aria-pressed', String(B.touchDrag)); mode.textContent = B.touchDrag ? 'Touch: drag' : 'Touch: scroll'; render({ type: 'none' }); if (eligible()) scheduleEndgameChecks(); announce(B.touchDrag ? 'Touch dragging enabled. Drag near an edge to scroll. Switch to scroll mode to swipe.' : 'Swipe to scroll. Tap cards to select and place.'); });
+    $('#btnRunMore')?.addEventListener('click', () => adjustRun(-1));
+    $('#btnRunLess')?.addEventListener('click', () => adjustRun(1));
+    $('#btnRunCancel')?.addEventListener('click', () => { if (!ES.UI.hasModal?.() && action()) { select(null); announce('Selection cancelled.'); } });
+    B.table.addEventListener('scroll', () => { B.lastTap = null; if (B.drag && !B.drag.started) B.drag.scrolled = true; });
     B.el.addEventListener('pointerdown', onDown);
     B.el.addEventListener('pointermove', onMove, { passive: false });
     B.el.addEventListener('pointerup', onUp);
     B.el.addEventListener('pointercancel', onCancel);
+    B.el.addEventListener('lostpointercapture', onCancel);
     B.el.addEventListener('keydown', onKey);
     B.el.addEventListener('focus', () => { B.hls[B.kb.col].classList.add('kb'); });
     B.el.addEventListener('blur', () => B.hls.forEach(h => h.classList.remove('kb')));
-    $('#btnUndo').addEventListener('click', doUndo);
-    $('#btnHint').addEventListener('click', doHint);
-    $('#btnStock').addEventListener('click', doDeal);
-    $('#btnFinish').addEventListener('click', runAutoComplete);
+    $('#btnUndo').addEventListener('click', () => { if (!ES.UI.hasModal?.()) doUndo(); });
+    $('#btnHint').addEventListener('click', () => { if (!ES.UI.hasModal?.()) doHint(); });
+    $('#btnStock').addEventListener('click', () => { if (!ES.UI.hasModal?.()) doDeal(); });
+    $('#btnFinish').addEventListener('click', () => { if (!ES.UI.hasModal?.()) runAutoComplete(); });
     let rt = 0;
-    root.addEventListener('resize', () => { cancelFrame(rt); rt = frame(() => { if (B.g && B.el.offsetParent) render({ type: 'none' }); }); });
+    root.addEventListener('resize', () => { if (B.drag) invalidate('pause'); cancelFrame(rt); rt = frame(() => { if (B.g && B.el.offsetParent) { render({ type: 'none' }); if (eligible()) scheduleEndgameChecks(); } }); });
     // pips
     $('#gSets').innerHTML = Array.from({ length: 8 }, () => `<span class="pip">${ES.Icons.icon('sets')}</span>`).join('');
   }

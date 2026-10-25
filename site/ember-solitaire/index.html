@@ -66,6 +66,7 @@
   <section class="screen" id="scr-game" data-env="forgeHall" data-field="board" aria-label="Spider Solitaire">
     <div class="bg"></div>
     <div class="fg game">
+      <a class="skip-board" href="#board">Skip to tableau</a>
       <header class="game-top">
         <button class="icon-btn" id="btnPause" aria-label="Pause"></button>
         <div class="game-title"><div class="display">Spider</div><span class="caps" id="gMode">2 Suit</span></div>
@@ -75,8 +76,9 @@
         </div>
       </header>
       <div class="sets-row" id="gSets" role="img" aria-label="Completed sets 0 of 8"></div>
+      <div class="board-help"><button id="btnTouchMode" type="button" aria-pressed="false" aria-controls="board">Touch: scroll</button><span class="board-scroll-tip">Swipe across for columns 1-10</span><details><summary>Board controls</summary><p id="boardHelp">Swipe to scroll; tap a card then a destination. Enable Touch: drag to drag cards; hold near an edge to scroll. Numbered column buttons select a run or place it. Arrow keys choose columns; Up/Down adjusts a selected run; Escape cancels. D deals, U undoes, H hints. Tab reaches all controls. More/Fewer cards adjusts a selected run without arrow keys.</p></details><div class="run-controls" id="runControls" hidden><span id="runSummary"></span><button id="btnRunMore" type="button">More cards</button><button id="btnRunLess" type="button">Fewer cards</button><button id="btnRunCancel" type="button">Cancel selection</button></div></div>
       <div class="table" id="table">
-        <div class="board" id="board" tabindex="0" role="application" aria-label="Tableau. Arrow keys choose a column, Enter picks up or places cards, D deals, U undoes, H hints." aria-describedby="gLive"></div>
+        <div class="board" id="board" tabindex="0" role="group" aria-label="Tableau. Arrow keys choose a column, Enter picks up or places cards, D deals, U undoes, H hints." aria-describedby="boardHelp"></div>
       </div>
       <button class="finish-btn" id="btnFinish" hidden><span class="i-finish"></span>Auto-complete</button>
       <footer class="game-bottom">

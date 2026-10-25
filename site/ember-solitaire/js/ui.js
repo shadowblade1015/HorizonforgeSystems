@@ -11,6 +11,55 @@
   const sheets = new Set();
   const UI = { current: null, stack: [], renderers: {} };
 
+
+  // Shared focus ownership for sheets and ceremonies; only the top modal is active.
+  const modals = [], isolated = new Map();
+  const topModal = () => modals[modals.length - 1];
+  const within = (el, node) => { for (let n = node; n; n = n.parentElement || n.parentNode || n.parent) if (n === el) return true; return false; };
+  function isolate() {
+    const top = topModal(), app = document.getElementById('app');
+    for (const el of app.children) {
+      if (!isolated.has(el)) isolated.set(el, { inert: !!el.inert, hidden: el.getAttribute ? el.getAttribute('aria-hidden') : null });
+      if (top) { el.inert = el !== top.el; if (el !== top.el) el.setAttribute('aria-hidden', 'true'); else el.removeAttribute('aria-hidden'); }
+    }
+    if (!top) {
+      for (const [el, old] of isolated) { el.inert = old.inert; if (old.hidden === null) el.removeAttribute('aria-hidden'); else el.setAttribute('aria-hidden', old.hidden); }
+      isolated.clear();
+    }
+  }
+  function modal(el, options = {}) {
+    const owner = { page: UI.current, navigation, profile: ES.Store.state, game: ES.Store.state.game };
+    const previous = document.activeElement;
+    el.setAttribute('role', 'dialog'); el.setAttribute('aria-modal', 'true'); el.setAttribute('aria-label', options.title || 'Ember Solitaire'); el.tabIndex = -1;
+    const record = { el }; modals.push(record);
+    const focusables = () => [...el.querySelectorAll('button, [href], input, select, textarea, [tabindex]')].filter(x => !x.disabled && !x.hidden && x.tabIndex !== -1 && !x.closest?.('[hidden], [inert]'));
+    const focus = () => { if (topModal() !== record) return; const list = focusables(), preferred = el.querySelector(options.focus || '.btn-primary'); (list.includes(preferred) ? preferred : list[0] || el).focus({ preventScroll: true }); };
+    record.focus = focus; focus(); isolate();
+    const onKey = e => {
+      if (topModal() !== record) return;
+      if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); options.dismiss?.(); }
+      if (e.key !== 'Tab') return;
+      const list = focusables(), first = list[0] || el, last = list[list.length - 1] || el;
+      if (!list.includes(document.activeElement) || !list.length || (e.shiftKey && document.activeElement === first) || (!e.shiftKey && document.activeElement === last)) { e.preventDefault(); (e.shiftKey ? last : first).focus(); }
+    };
+    const onFocus = e => { if (topModal() === record && !within(el, e.target)) focus(); };
+    document.addEventListener('keydown', onKey, true); document.addEventListener('focusin', onFocus, true);
+    let closed = false;
+    return () => {
+      if (closed) return; closed = true;
+      const wasTop = topModal() === record; modals.splice(modals.indexOf(record), 1);
+      document.removeEventListener('keydown', onKey, true); document.removeEventListener('focusin', onFocus, true);
+      isolate(); el.inert = true; el.setAttribute('aria-hidden', 'true');
+      if (modals.length) isolated.set(el, { inert: true, hidden: 'true' });
+      const top = topModal();
+      const sameOwner = navigation === owner.navigation && UI.current === owner.page && ES.Store.state === owner.profile && ES.Store.state.game === owner.game;
+      if (wasTop && sameOwner) {
+        if (previous && previous.isConnected !== false && !previous.inert && !previous.closest?.('[inert], [hidden]') && (!top || within(top.el, previous))) previous.focus({ preventScroll: true });
+        else if (top) top.focus();
+      }
+    };
+  }
+
   function esc(s) { return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
   function n(v) { return Number(v || 0).toLocaleString('en-US'); }
   function dur(ms) {
@@ -103,34 +152,27 @@
       <div class="sheet-body">${o.body || ''}</div>
       ${o.actions && o.actions.length ? `<div class="menu-list">${o.actions.map((a, i) => `<div class="${a.primary ? 'cta' : ''}"><button class="btn btn-block ${a.primary ? 'btn-primary' : a.ghost ? 'btn-ghost' : ''}" data-i="${i}">${a.icon ? I(a.icon) : ''}${esc(a.label)}</button></div>`).join('')}</div>` : ''}
     </div></div>`;
-    const prevFocus = document.activeElement;
     document.getElementById('app').appendChild(wrap);
     const enterFrame = requestAnimationFrame(() => { if (!closed) wrap.classList.add('is-in'); });
     let focusTimer;
     const close = (val) => {
       if (closed) return; closed = true; wrap.lifecycleClosed = true;
       clearTimeout(focusTimer); cancelAnimationFrame(enterFrame); sheets.delete(close); unsubscribe(); release();
-      wrap.classList.remove('is-in'); document.removeEventListener('keydown', onKey, true);
+      wrap.classList.remove('is-in'); releaseModal();
       setTimeout(() => wrap.remove(), ES.FX.motion() ? 220 : 0);
-      if (prevFocus && prevFocus.isConnected !== false && prevFocus.focus) prevFocus.focus({ preventScroll: true });
       o.onClose && o.onClose(val);
     };
-    const onKey = e => {
-      if (closed) return;
-      if (e.key === 'Escape' && o.closable !== false) { e.stopPropagation(); close(); }
-      if (e.key === 'Tab') { const f = [...wrap.querySelectorAll('button, [href], input, select, [tabindex]:not([tabindex="-1"])')].filter(x => !x.disabled); if (!f.length) return; const a = f[0], z = f[f.length - 1]; if (e.shiftKey && document.activeElement === a) { z.focus(); e.preventDefault(); } else if (!e.shiftKey && document.activeElement === z) { a.focus(); e.preventDefault(); } }
-    };
-    document.addEventListener('keydown', onKey, true);
+    const releaseModal = modal(wrap, { title: o.title, focus: o.focus, dismiss: o.closable !== false ? close : null });
     sheets.add(close);
     if (ES.Board && ES.Board.onInvalidate) unsubscribe = ES.Board.onInvalidate(kind => { if (kind !== 'pause') close(); });
     wrap.addEventListener('click', e => {
-      if (closed) return;
+      if (closed || topModal()?.el !== wrap) return;
       if (e.target === wrap && o.closable !== false) return close();
       if (e.target.closest('.sheet-x')) return close();
       const b = e.target.closest('[data-i]'); if (b) { ES.Audio.play('ui'); const a = o.actions[+b.dataset.i]; if (a.onClick && a.onClick(close) === false) return; if (!a.keepOpen) close(a.value); }
     });
     if (o.onMount) o.onMount(wrap, close);
-    focusTimer = setTimeout(() => { if (closed) return; const f = wrap.querySelector(o.focus || '.btn-primary, .btn, button'); f && f.focus({ preventScroll: true }); }, 60);
+    focusTimer = setTimeout(() => { if (!closed && topModal()?.el === wrap) topModal().focus(); }, 60);
     return close;
   }
 
@@ -251,12 +293,13 @@
 
   /* global delegated navigation */
   document.addEventListener('click', e => {
+    if (topModal() && !within(topModal().el, e.target)) return;
     const g = e.target.closest('[data-go]');
     if (g) { ES.Audio.unlock(); ES.Audio.play('ui'); go(g.dataset.go); return; }
     const b = e.target.closest('[data-back]');
     if (b) { ES.Audio.play('ui'); back(); }
   });
 
-  Object.assign(UI, { saveRecovery, mountSaveStatus, $, $$, esc, n, dur, clock, date, go, back, render, toast, sheet, header, molten, levelBadge, artifactStage, wireHeat, animateHeat, hydrateIcons, applySettings, setEnv, I });
+  Object.assign(UI, { modal, hasModal: () => !!topModal(), isActiveModal: el => topModal()?.el === el, saveRecovery, mountSaveStatus, $, $$, esc, n, dur, clock, date, go, back, render, toast, sheet, header, molten, levelBadge, artifactStage, wireHeat, animateHeat, hydrateIcons, applySettings, setEnv, I });
   ES.UI = UI;
 })(typeof window !== 'undefined' ? window : globalThis);

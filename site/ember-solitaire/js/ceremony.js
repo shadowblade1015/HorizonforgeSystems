@@ -13,8 +13,9 @@
     el.setAttribute('role', 'dialog'); el.setAttribute('aria-modal', 'true');
     el.innerHTML = html;
     document.getElementById('app').appendChild(el);
+    const releaseModal = UI.modal ? UI.modal(el, { title: cls === 'victory' ? 'Victory' : cls === 'transform' ? 'Forge transformation' : 'Legendary artifact' }) : () => {};
     const entrance = requestAnimationFrame(() => { if (el.isConnected !== false) el.classList.add('is-in'); });
-    el.cancelEntrance = () => cancelAnimationFrame(entrance);
+    el.cancelEntrance = () => { cancelAnimationFrame(entrance); releaseModal(); };
     return el;
   }
   function closeLayer(el) { el.cancelEntrance(); el.classList.remove('is-in'); setTimeout(() => el.remove(), ES.FX.motion() ? 400 : 0); }
@@ -114,7 +115,7 @@
       el.querySelector('#vicPct').textContent = to + '%';
       if (St().ready() && !ready) { ready = true; const b = el.querySelector('#vicForge'); b.textContent = 'Strike the Forge'; b.parentElement.classList.add('is-ready'); }
     };
-    defer(() => el.querySelector('#vicForge').focus(), 400);
+    defer(() => { if (!UI.isActiveModal || UI.isActiveModal(el)) el.querySelector('#vicForge').focus(); }, 400);
     return true;
   }
 
@@ -138,7 +139,7 @@
       <div class="tf-stage artifact-stage" id="tfStage">${UI.artifactStage(id, from, 100, { prop: 'anvil' })}</div>
       ${HAMMER}
       <div class="flash"></div>
-      <div class="tf-title">
+      <div class="tf-title" inert>
         <h2 class="display xl ember-text">${A().TIERS[to]}</h2>
         <div class="display md">${esc(def.name)}</div>
         <p class="muted lore">“${A().TIER_LORE[to]}”</p>
@@ -149,7 +150,7 @@
     const stage = el.querySelector('#tfStage');
     UI.wireHeat(stage, id, 100);
     const swap = () => { stage.innerHTML = UI.artifactStage(id, to, 0, { prop: 'anvil' }); UI.wireHeat(stage, id, 0); };
-    const finish = () => { if (!scene.current()) return; el.classList.add('show-title'); scene.later(() => el.querySelector('#tfContinue').focus(), 50); };
+    const finish = () => { if (!scene.current()) return; el.classList.add('show-title'); el.querySelector('.tf-title').removeAttribute('inert'); scene.later(() => { if (UI.isActiveModal(el)) el.querySelector('#tfContinue').focus(); }, 50); };
     const sk = el.querySelector('#tfSkip');
     if (sk) sk.onclick = () => { if (!scene.current()) return; skipped = true; el.classList.add('skipped'); swap(); finish(); };
     el.querySelector('#tfContinue').onclick = () => { if (!scene.current()) return; scene.dispose(true); ES.FX.setField('forge'); UI.go('forge', { force: true }); };
@@ -188,7 +189,7 @@
         <div class="display md">${esc(def.name)}</div>
         <div class="ornament"></div>
       </div>
-      <div class="lg-stats content">
+      <div class="lg-stats content" inert>
         <div class="panel">
           <div class="caps center">The Journey</div>
           <div class="journey">
@@ -213,8 +214,8 @@
     const r = stage.getBoundingClientRect(); ES.FX.sparks(r.left + r.width / 2, r.top + r.height / 2, 30, 160, { up: true, dur: 900 });
     await scene.wait(400); if (!scene.current()) return; el.classList.remove('white');
     await scene.wait(900); if (!scene.current()) return; el.classList.add('show-title');
-    await scene.wait(1200); if (!scene.current()) return; el.classList.add('show-stats');
-    scene.later(() => el.querySelector('#lgPlace').focus(), 100);
+    await scene.wait(1200); if (!scene.current()) return; el.classList.add('show-stats'); el.querySelector('.lg-stats').removeAttribute('inert');
+    scene.later(() => { if (UI.isActiveModal(el)) el.querySelector('#lgPlace').focus(); }, 100);
   }
 
   ES.Ceremony = { victory, strike, legendary };

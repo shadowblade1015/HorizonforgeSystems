@@ -20,23 +20,23 @@ export function lifecycleHarness(options={}) {
   const listen=(map,key,fn)=>{if(!map.has(key))map.set(key,new Set());map.get(key).add(fn);};
   const emit=(map,key,event={})=>{for(const fn of [...map.get(key)||[]])fn(event);};
   class Element {
-    constructor(tag='div'){this.tag=tag;this.children=[];this.parent=null;this.dataset={};this.handlers=new Map();this.locals=new Map();this.classes=new Set();this.style={setProperty(k,v){this[k]=v;}};this.clientWidth=1000;this.clientHeight=700;this.offsetParent={};this.scrollTop=0;this.focuses=0;
+    constructor(tag='div'){this.tag=tag;this.children=[];this.parent=null;this.dataset={};this.handlers=new Map();this.locals=new Map();this.classes=new Set();this.style={setProperty(k,v){this[k]=v;}};this.clientWidth=1000;this.clientHeight=700;this.offsetParent={};this.scrollTop=0;this.scrollLeft=0;this.focuses=0;
       this.classList={add:(...a)=>a.forEach(x=>this.classes.add(x)),remove:(...a)=>a.forEach(x=>this.classes.delete(x)),contains:x=>this.classes.has(x),toggle:(x,flag)=>{const add=flag===undefined?!this.classes.has(x):flag;add?this.classes.add(x):this.classes.delete(x);return add;}};
     }
     set className(v){this.classes=new Set(v.split(/\s+/).filter(Boolean));}get className(){return [...this.classes].join(' ');}
     get isConnected(){return this.root||!!this.parent?.isConnected;}
-    set innerHTML(value){this.html=value;for(const m of value.matchAll(/id="([^"]+)"/g)){const n=new Element('button');n.id=m[1];this.locals.set('#'+m[1],n);this.appendChild(n);}}
+    set innerHTML(value){this.html=value;for(const m of value.matchAll(/id="([^"]+)"/g)){const n=new Element('button');n.id=m[1];this.locals.set('#'+m[1],n);this.appendChild(n);}for(const m of value.matchAll(/<button\b([^>]*)>/g)){if(/\bid=/.test(m[1]))continue;const n=new Element('button');const cls=m[1].match(/class="([^"]*)"/);if(cls)n.className=cls[1];this.appendChild(n);}}
     get innerHTML(){return this.html||'';}
     appendChild(n){if(n.parent)n.remove();this.children.push(n);n.parent=this;return n;}
     append(...ns){ns.forEach(n=>this.appendChild(n));}
     remove(){if(this.parent)this.parent.children=this.parent.children.filter(n=>n!==this);this.parent=null;}
-    setAttribute(k,v){this[k]=v;}removeAttribute(k){delete this[k];}
+    setAttribute(k,v){this[k]=v;}removeAttribute(k){delete this[k];}getAttribute(k){return this[k]??null;}
     addEventListener(k,fn){listen(this.handlers,k,fn);}removeEventListener(k,fn){this.handlers.get(k)?.delete(fn);}dispatch(k,e={}){emit(this.handlers,k,e);}
     focus(){this.focuses++;document.activeElement=this;}
     getBoundingClientRect(){return {left:0,top:0,width:this.clientWidth,height:this.clientHeight};}
     setPointerCapture(){}releasePointerCapture(){}
     querySelector(s){if(this.locals.has(s))return this.locals.get(s);if(s.startsWith('#'))return nodes.get(s)||null;if(['svg.artifact-svg',':scope > .bg','h1, h2, .display','#vicStoke'].includes(s))return null;const n=new Element();this.locals.set(s,n);this.appendChild(n);return n;}
-    querySelectorAll(s){if(s==='.stock-pile i')return [];if(s==='[data-icon]')return [];const cls=s.slice(1);return descendants(this).filter(n=>n.classList.contains(cls));}
+    querySelectorAll(s){if(s.includes('button,'))return descendants(this).filter(n=>['button','input','select','textarea','a'].includes(n.tag)||n.tabIndex!==undefined);if(s==='.stock-pile i')return [];if(s==='[data-icon]')return [];const cls=s.slice(1);return descendants(this).filter(n=>n.classList.contains(cls));}
     closest(s){return s.startsWith('.')&&this.classList.contains(s.slice(1))?this:null;}
     getAnimations(){return animations.filter(a=>a.node===this&&!a.done);}
     animate(frames,opts={}){const a={node:this,frames,opts,done:false,onfinish:null,cancel(){a.done=true;clock.clearTimeout(a.id);},finish(){if(a.done)return;a.done=true;clock.clearTimeout(a.id);a.onfinish?.();}};a.id=clock.setTimeout(()=>a.finish(),(opts.duration||0)+(opts.delay||0));animations.push(a);return a;}
@@ -65,7 +65,7 @@ export function lifecycleHarness(options={}) {
   es.Board.mount();es.UI.go('game');
   function start(g=h.E.newGame(1,{seed:42}),opts={}){h.S.startGame(g);es.UI.go('game');es.Board.start(g,opts);return g;}
   return {...h,clock,document,nodes,get,animations,events,workers,load,start,B:es.Board,UI:es.UI,debug:h.context.__boardTest,
-    visibility(hidden){document.hidden=hidden;emit(docEvents,'visibilitychange');},page(name){emit(windowEvents,name);},keydown(e){get('#board').dispatch('keydown',{preventDefault(){},...e});},Element};
+    visibility(hidden){document.hidden=hidden;emit(docEvents,'visibilitychange');},page(name){emit(windowEvents,name);},documentKeydown(e){emit(docEvents,'keydown',{preventDefault(){},stopPropagation(){},...e});},resize(){emit(windowEvents,'resize');},keydown(e){get('#board').dispatch('keydown',{preventDefault(){},...e});},Element};
 }
 
 export function finalHand(E,split=1){

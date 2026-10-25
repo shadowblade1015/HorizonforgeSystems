@@ -215,3 +215,33 @@ img, svg { display: block; }
 .save-status { position: fixed; z-index: 55; top: max(8px, env(safe-area-inset-top)); left: 50%; transform: translateX(-50%); width: min(94vw, 620px); padding: 10px; display: flex; align-items: center; gap: 10px; background: #211a16; color: #f3eee4; border: 1px solid #dfab66; border-radius: 10px; font-size: 12px; box-shadow: 0 4px 20px #0008; }
 .save-status[hidden] { display: none; }
 .save-status .btn { flex-shrink: 0; font-size: 12px; padding: 8px; }
+
+/* Short displays, text resizing, modal input isolation and safe-area gutters. */
+.overlay { padding: max(8px, var(--safe-top)) max(8px, var(--safe-right)) max(8px, var(--safe-bottom)) max(8px, var(--safe-left)); }
+.sheet { max-height: 100%; overscroll-behavior: contain; }
+.sheet .panel { overflow-wrap: anywhere; }
+.sheet input, .sheet select, .sheet textarea { max-width: 100%; min-width: 0; }
+[inert] { pointer-events: none; }
+.screen > .fg:not(.game) { overflow-y: auto; overflow-x: hidden; }
+.screen > .fg > * { flex-shrink: 0; }
+.screen > .fg.game > .table { flex-shrink: 1; }
+.screen { padding-left: var(--safe-left); padding-right: var(--safe-right); }
+.btn { white-space: normal; height: auto; }
+.save-status { flex-wrap: wrap; max-height: 40dvh; overflow: auto; }
+:root[data-reduced="1"] .ceremony, :root[data-reduced="1"] .ceremony * { animation: none !important; transition-duration: 1ms !important; }
+@media (prefers-reduced-motion: reduce) { .ceremony, .ceremony *, .splash *, .intro-story .line { animation: none !important; transition-duration: 1ms !important; } .intro-story .line { opacity: 1; } }
+
+.skip-board { position: absolute; left: 12px; top: 8px; z-index: 40; padding: 10px; background: #15191d; color: var(--white-heat); transform: translateY(-200%); }
+.skip-board:focus { transform: none; }
+.hdr { grid-template-columns: var(--tap) minmax(0, 1fr) var(--tap); }
+.hdr .ttl { min-width: 0; overflow-wrap: anywhere; }
+.tabbar-inner { grid-template-columns: repeat(5, minmax(44px, 1fr)); overflow-x: auto; scrollbar-width: thin; }
+
+/* Reflow in the actual container, including browser/CSS zoom. */
+.content, .hdr { container-type: inline-size; }
+.content > * { min-width: 0; }
+.tab > span:last-child { max-width: 100%; overflow-wrap: anywhere; text-align: center; line-height: 1.2; }
+@container (max-width: 260px) {
+ .hdr .ttl { grid-column: 1 / -1; grid-row: 1; overflow-wrap: normal; }
+ .hdr > .icon-btn, .hdr > span { grid-row: 2; }
+}

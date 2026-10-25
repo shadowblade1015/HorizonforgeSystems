@@ -1,20 +1,20 @@
 # Testing, source ownership and recovery
 
-October 18, 2026. Node 24 is the tested baseline. Built-in Node modules only; no install step.
+October 23, 2026. Node 24 is the tested baseline. Built-in Node modules only; no install step.
 
 ## Structure and commands
 
-Edit authoritative files under `site/`, keeping relative public paths intact. The 143 migrated files retain their original bytes, including binary assets. `.gitattributes` disables text conversion for this tree to preserve bytes across checkouts. `dist/` is ignored generated output. Tests, fixtures, tools, audit documents, the original inventory and historical archive remain outside it.
+Edit authoritative files under `site/`, keeping relative public paths intact. The Phase 2 migration preserved all 143 original files byte for byte, including binary assets; later approved source changes are tracked directly. `.gitattributes` disables text conversion for this tree to preserve bytes across checkouts. `dist/` is ignored generated output. Tests, fixtures, tools, audit documents, the original inventory and historical archive remain outside it.
 
 From the repository root:
 
 ```powershell
 node build.mjs
 node tools/verify-source.mjs
-node --test tests/*.test.mjs
+node --test
 ```
 
-The engine/persistence regression suites load `site/` directly and require no build output. The verifier integration tests inspect generated output; run the build before the full suite. TODO assertions still express intended behavior and fail as documented below; they do not make Node exit nonzero. An unexpectedly passing TODO requires investigation.
+The engine/persistence regression suites load `site/` directly and require no build output. The verifier integration tests inspect generated output; run the build before the full suite. All original defect assertions now run as ordinary tests. Any failing assertion makes the suite fail; no known-defect TODO markers remain.
 
 ## Build and verification
 
@@ -129,3 +129,13 @@ Run `node build.mjs`, `node tools/verify-source.mjs`, `node --test`, `git diff -
 Board owns runtime display sessions, position revisions and cancellation epochs; those tokens are never saved. Manual input cancels auto-complete before applying an eligible action. Worker replies, animations, delayed notifications and victory presentation must retain ownership. Modal holds and foreground visibility govern a single performance.now-based clock; save/export flushes fractional elapsed time. Phase 3A safe writes and Phase 3B hand IDs/payout receipts are unchanged.
 
 Build verification reports **143 matching source/output files, zero errors**, with 23 syntax checks, two JSON checks, 421 local references, 131 precache URLs and nine routes. The historical archive/inventory remain unchanged; 132 files still match archive bytes. See [PHASE_3D_REPORT.md](PHASE_3D_REPORT.md) for the pre-change map, implementation, clock/cancellation policy, complete test coverage and manual browser checklist. F03, multi-tab conflicts, broader accessibility and search-performance/heuristic work remain separate.
+
+## Phase 3E mobile and accessibility validation
+
+Run `node build.mjs`, `node tools/verify-source.mjs`, `node --test`, `git diff --check` and `git status --short`. Final suite: **245 tests, 245 pass, zero failures/TODOs/skips/cancellations**. All original 205 Phase 3D tests remain passing; 40 new deterministic cases cover mobile geometry, validated 25/45-card columns, touch ownership and thresholds, both scroll axes and edge scrolling, cancellation/lifecycle transitions, keyboard/native column and run controls, announcements and nested modal focus/isolation/restoration. Existing assertions were not weakened.
+
+The optional `node tools/mobile-browser.mjs after` audit uses built-in Node modules, an installed Windows Chrome (or `CHROME_PATH`), a local static server and a fresh disposable profile. No package install or normal player browser profile is used. It captures seven viewport sizes, narrow screens/ceremonies/recovery, enlarged cards and 200% CSS zoom. CDP touch/keyboard checks exercise actual browser scrolling, dragging and modal focus; failed flow assertions exit nonzero. `before` serves committed HEAD rather than working-tree changes. Reinterpret that baseline after a future commit. Screenshots/JSON are ignored local evidence under `.phase2-backup/phase3e-browser/`; the script is tracked and evidence is reproducible.
+
+Build/verifier: 143 matching source/output files, zero errors; 129 retain historical archive bytes. Archive/inventory, engine/save/settlement semantics, artwork and Vercel/service-worker configuration are unchanged. Touch scrolling is the default; deliberately enable Touch: drag for touch dragging. Visible numbered columns and More/Fewer/Cancel controls supplement keyboard shortcuts and preserve accessible alternatives without a broad application role.
+
+Executed browser: headless Chrome 155.0.8059.86 on Windows with viewport/touch emulation. This does not certify physical Safari/Android behavior, screen-reader speech, OS large text, real browser toolbar zoom or WCAG conformance. The remaining release checks and exact evidence paths are in [PHASE_3E_REPORT.md](PHASE_3E_REPORT.md) and [MOBILE_TEST_MATRIX.md](MOBILE_TEST_MATRIX.md).

@@ -17,6 +17,8 @@ function uiHarness(raw = null, options = {}) {
     click() { this.clicked = true; if (this.onclick) this.onclick(); }
     focus() {}
     setAttribute(k,v) { this[k] = v; }
+    removeAttribute(k) { delete this[k]; }
+    getAttribute(k) { return this[k] ?? null; }
     querySelector(selector) { return selector.startsWith('#') ? this.nodes.get(selector.slice(1)) : null; }
     querySelectorAll() { return []; }
     addEventListener(k, fn) { this.handlers[k] = fn; }

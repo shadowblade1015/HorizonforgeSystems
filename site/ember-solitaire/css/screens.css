@@ -408,3 +408,32 @@
 /* test double for ads (?ads=mock only) */
 .mock-ad { position: fixed; inset: 0; z-index: 200; display: grid; place-items: center; background: #1d2a3a; color: #fff; font-family: var(--font-ui); }
 .mock-ad-box { display: grid; gap: 12px; text-align: center; padding: 24px; }
+
+/* Ceremony actions remain reachable on short viewports and enlarged text. */
+.tf-title { max-height: 65dvh; overflow-y: auto; overscroll-behavior: contain; }
+.legendary-cer.show-stats .lg-stats { max-height: 55dvh; overflow-y: auto; overscroll-behavior: contain; }
+
+/* Settings controls reflow within their actual available width, including zoom. */
+.settings { grid-template-columns: minmax(0, 1fr); }
+.set-group { container-type: inline-size; min-width: 0; }
+.set-row { grid-template-columns: 30px minmax(0, 1fr) auto; }
+.set-row.link { grid-template-columns: 30px minmax(0, 1fr) auto 18px; }
+.set-txt, .set-val { min-width: 0; overflow-wrap: anywhere; }
+@container (max-width: 260px) {
+ .set-row, .set-row.link { grid-template-columns: 24px minmax(0, 1fr); padding-block: 10px; gap: 8px; }
+ .set-row > .range, .set-row > .switch, .set-row > .set-val { grid-column: 2; max-width: 100%; margin-bottom: 6px; }
+ .set-row > .range { width: 100%; }
+ .set-row > .chev { display: none; }
+}
+
+.home-top, .forge-top, .level { flex-wrap: wrap; gap: 8px; }
+.lvl-meta { min-width: 0; max-width: 100%; flex: 1 1 80px; }
+.ready-title, .forge-ember { white-space: normal; }
+@container (max-width: 260px) {
+ .mode, .today-panel, .daily-teaser, .smith, .stat-row, .stoke { grid-template-columns: minmax(0, 1fr); }
+ .mode-reward, .resume { flex-wrap: wrap; }
+ .col-grid, .forge-actions, .journey { grid-template-columns: minmax(0, 1fr); }
+ .medals, .pause-stats, .kv { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+ .medal-cell { min-width: 0; overflow-wrap: anywhere; }
+ .panel-title { flex-wrap: wrap; }
+}

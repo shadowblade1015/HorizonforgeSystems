@@ -1,5 +1,9 @@
 # Phase 4 issue register
 
+## October 26 follow-up: Phase 4.2
+
+**P4-03, P4-04 and P4-05: repaired in the Phase 4.1-based candidate.** [P4_02_REMEDIATION_REPORT.md](P4_02_REMEDIATION_REPORT.md) records the independently reproduced original failures, exact fixes, evidence-handling deviation and remaining gates. Final checks: **329 Node, 13 mobile, 42 offline, 19 multi-tab; independent browser 32 PASS / 0 FAIL**. Offline claims now require separate same-release core/artwork readiness; live motion changes cancel/restart only eligible effects; Later restores focus through shared screen/modal ownership. Earlier FAIL statements below are historical observations, not current candidate status. **P4-02/F13 solver work is deferred to Phase 4.3.** Overall launch remains NO-GO; no deployment or physical-device/AT certification was performed.
+
 ## October 26 follow-up: P4-01 remediation
 
 **P4-01: repaired for supported cooperating releases; legacy-tab rollout gate remains.** See [P4_01_REMEDIATION_REPORT.md](P4_01_REMEDIATION_REPORT.md) for the current source, support boundary and every protected writer. An exclusive lifetime Web Lock plus loaded-primary/backup checks replaces the unsafe concurrent-writer behavior. The three retained observed-loss tests now require preservation. New evidence: **304 passing Node tests, 19/19 actual multi-tab Chrome checks, 42/42 offline upgrade checks and 13/13 mobile checks**. The independent Phase 4 browser stale-tab case is now PASS; P4-03/P4-04/P4-05 remain FAIL observations (19 PASS / 3 FAIL overall).

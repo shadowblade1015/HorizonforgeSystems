@@ -5,15 +5,17 @@ import {resolve,extname} from 'node:path';
 import {execFileSync} from 'node:child_process';
 import {readTree,root} from './verify-source.mjs';
 import {chromeAudit,until} from './chrome-audit.mjs';
-const out=resolve(root,process.env.HFS_PHASE4_EVIDENCE||'.phase2-backup/phase4/independent');mkdirSync(out,{recursive:true});
+const out=resolve(root,process.env.HFS_PHASE4_EVIDENCE||'.phase2-backup/phase4-browser');mkdirSync(out,{recursive:true});
 const files=readTree(resolve(root,'dist')),release=JSON.parse(files.get('ember-solitaire/release.json'));
 const requests=[],checks=[],labs=[],errors=[],failedRequests=[];
+let networkOnline=true;
 const server=createServer((req,res)=>{
  const u=new URL(req.url,'http://localhost'),p=u.pathname.slice(1)+(u.pathname.endsWith('/')?'index.html':'');
  const b=files.get(p),status=b?200:404;requests.push({path:p,status,bytes:b?.length||0});
+ if(!networkOnline){res.destroy();return;}
  res.writeHead(status,{'Cache-Control':'no-store','Content-Type':({'.html':'text/html','.js':'text/javascript','.css':'text/css','.json':'application/json','.webmanifest':'application/manifest+json','.woff2':'font/woff2','.webp':'image/webp','.png':'image/png'})[extname(p)]||'text/plain'});res.end(b||'Not found');
 });
-await new Promise(r=>server.listen(0,'127.0.0.1',r));const origin='http://127.0.0.1:'+server.address().port,base=origin+'/ember-solitaire/';let chrome,page;
+await new Promise(r=>server.listen(0,'127.0.0.1',r));const origin='http://127.0.0.1:'+server.address().port,base=origin+'/ember-solitaire/';let chrome,page,motionChrome;
 const record=(name,pass,detail)=>{checks.push({name,status:pass?'PASS':'FAIL',detail});console.log((pass?'PASS ':'FAIL ')+name);};
 const shot=async(tab,name)=>writeFileSync(resolve(out,name+'.png'),Buffer.from((await tab.call('Page.captureScreenshot',{format:'png'})).data,'base64'));
 const rpc=data=>`new Promise((resolve,reject)=>{const c=new MessageChannel(),t=setTimeout(()=>reject(Error('RPC timeout')),15000);c.port1.onmessage=e=>{clearTimeout(t);c.port1.close();resolve(e.data)};navigator.serviceWorker.controller.postMessage(${JSON.stringify(data)},[c.port2])})`;
@@ -56,13 +58,29 @@ try {
   await tab.call('HeapProfiler.collectGarbage');const churnAfter=await tab.call('Memory.getDOMCounters'),heapAfter=await tab.call('Runtime.getHeapUsage');const targets=await chrome.send('Target.getTargets');
   labs.push({config,introMs:intro,playableMs:playable,initial,interactions,animation,solver,boardSolver,solverFrames,afterSolver,churn:{iterations:20,before:churnBefore,after:churnAfter,heapBefore,heapAfter,workers:targets.targetInfos.filter(t=>t.type==='worker').length}});
   if(config.name==='desktop-cold'){
+   // Isolate interactive media changes from intrusive heap/GC profiling.
+   motionChrome=await chromeAudit();const motionTab=await motionChrome.tab();page=motionTab;await motionTab.call('Page.addScriptToEvaluateOnNewDocument',{source:observe});
+   await motionTab.navigate(base+'?nosw&screen=home');await motionTab.call('Page.bringToFront');
+   await until(()=>motionTab.evaluate('ES?.UI?.current==="home"'),'motion screen');
    // Existing bundle behavior with changing OS preference, not a source rewrite.
-   await tab.evaluate('ES.Store.state.settings.reduced=false;ES.UI.go("home");ES.FX.setField("home")');
-   await tab.call('Emulation.setEmulatedMedia',{features:[{name:'prefers-reduced-motion',value:'reduce'}]});
-   const before=await tab.evaluate('audit.draws');await new Promise(r=>setTimeout(r,250));
-   const reduced=await tab.evaluate('({motion:ES.FX.motion(),draws:audit.draws,opacity:getComputedStyle(document.querySelector("#emberField")).opacity})');
+   await motionTab.evaluate('ES.Store.state.settings.reduced=false;ES.UI.go("home");ES.FX.setField("home")');
+   await until(()=>motionTab.evaluate('audit.draws>0'),'ambient draws before preference change');
+   await motionTab.call('Emulation.setEmulatedMedia',{features:[{name:'prefers-reduced-motion',value:'reduce'}]});
+   // Flush the emulation change through Chrome's rendering event cycle.
+   await motionTab.evaluate('new Promise(requestAnimationFrame)');
+   await until(()=>motionTab.evaluate('!ES.FX.motion()&&document.querySelector("#emberField").style.opacity==="0"'),'dynamic reduced motion applied');
+   const before=await motionTab.evaluate('audit.draws');await new Promise(r=>setTimeout(r,250));
+   const reduced=await motionTab.evaluate('({motion:ES.FX.motion(),draws:audit.draws,opacity:getComputedStyle(document.querySelector("#emberField")).opacity})');
    record('OS reduced-motion change stops existing ambient canvas',reduced.draws===before,{before,...reduced});
-   await tab.call('Emulation.setEmulatedMedia',{features:[{name:'prefers-reduced-motion',value:'no-preference'}]});
+   await motionTab.call('Emulation.setEmulatedMedia',{features:[{name:'prefers-reduced-motion',value:'no-preference'}]});
+   await motionTab.evaluate('new Promise(requestAnimationFrame)');
+   await until(()=>motionTab.evaluate('ES.FX.motion()&&audit.draws>'+reduced.draws),'active motion resumes');const restored=await motionTab.evaluate('audit.draws');
+   record('OS normal motion restores active ambient draws',restored>reduced.draws,{restored,stopped:reduced.draws});
+   await motionTab.evaluate('ES.Store.state.settings.reduced=true;ES.UI.applySettings()');const settingStopped=await motionTab.evaluate('audit.draws');
+   await motionTab.call('Emulation.setEmulatedMedia',{features:[{name:'prefers-reduced-motion',value:'reduce'}]});
+   await motionTab.call('Emulation.setEmulatedMedia',{features:[{name:'prefers-reduced-motion',value:'no-preference'}]});
+   await new Promise(r=>setTimeout(r,100));record('in-game reduced motion remains authoritative over OS changes',await motionTab.evaluate('audit.draws')===settingStopped);
+   await motionChrome.close();motionChrome=null;page=tab;await tab.call('Page.bringToFront');
    // Canonical final-set fixture, not a claim of a human-played complete hand.
    const victory=await tab.evaluate(`(()=>{ES.Store.state.settings.reduced=true;const g=ES.Engine.newGame(1,{seed:42}),c=ES.Engine.newDeck(1,()=>0).filter(x=>parseInt(x.id.slice(1),36)<13).sort((a,b)=>b.rank-a.rank);c.forEach(x=>x.up=true);g.cols=[c.slice(0,12),[c[12]],...Array.from({length:8},()=>[])];g.stock=[];g.completed=g.bestCompleted=7;ES.Store.startGame(g);ES.UI.go('game');ES.Board.start(g);ES.Store.validateHand(g);const before=ES.Store.state.stats.wins;ES.Board.doMove(1,0,0);return ES.Store.state.stats.wins===before+1})()`);
    await until(()=>tab.evaluate('!!document.querySelector(".ceremony")'),'victory ceremony');record('canonical victory settles and presents',victory);await shot(tab,'victory');
@@ -102,13 +120,38 @@ try {
  const cache='ember-solitaire:'+encodeURIComponent(base)+':release-v1:'+release.id;
  const quota=await tab.evaluate('navigator.storage.estimate()');record('generated core installs with ready catalog',true,{installMs,coreBytes:release.files.filter(f=>f.core).reduce((n,f)=>n+f.bytes,0),quota});
  const laterFocus=await tab.evaluate('(()=>{const b=[...document.querySelectorAll(".offline-status button")].find(b=>b.textContent==="Later");b.focus();b.click();return {active:document.activeElement.tagName,id:document.activeElement.id,hidden:!!document.activeElement.closest("[hidden]")}})()');record('Later restores focus outside hidden update panel',!laterFocus.hidden&&laterFocus.active!=='BODY',laterFocus);
+ await tab.evaluate('ES.UI.go("settings")');await new Promise(r=>setTimeout(r,60));
+ await tab.evaluate('document.querySelector("#setOffline").focus();document.querySelector("#setOffline").click()');
+ await until(()=>tab.evaluate('!document.querySelector(".offline-status").hidden'),'settings updates notice');
+ await tab.evaluate('[...document.querySelectorAll(".offline-status button")].find(b=>b.textContent==="Save Recovery").focus()');
+ await tab.call('Input.dispatchKeyEvent',{type:'keyDown',key:'Tab',code:'Tab',windowsVirtualKeyCode:9});await tab.call('Input.dispatchKeyEvent',{type:'keyUp',key:'Tab',code:'Tab',windowsVirtualKeyCode:9});
+ record('keyboard Tab reaches Later',await tab.evaluate('document.activeElement.textContent==="Later"'));
+ await tab.call('Input.dispatchKeyEvent',{type:'keyDown',key:'Enter',code:'Enter',windowsVirtualKeyCode:13,text:'\r'});await tab.call('Input.dispatchKeyEvent',{type:'keyUp',key:'Enter',code:'Enter',windowsVirtualKeyCode:13});
+ record('Settings Later returns keyboard focus to Offline and Updates',await tab.evaluate('document.activeElement.id==="setOffline"&&document.querySelector(".offline-status").hidden'));
+ await tab.evaluate('ES.Offline.check();ES.UI.go("home");[...document.querySelectorAll(".offline-status button")].find(b=>b.textContent==="Later").focus();ES.Offline.defer()');await new Promise(r=>setTimeout(r,80));
+ record('navigation during notice dismissal cannot focus obsolete Settings',await tab.evaluate('!document.activeElement.closest("[hidden],[inert]")&&!!document.querySelector("#scr-home").contains(document.activeElement)'));
+ await tab.evaluate('ES.Offline.check();ES.UI.saveRecovery();self.auditDialogFocus=document.activeElement;ES.Offline.defer()');
+ record('Later respects active Save Recovery modal focus',await tab.evaluate('document.activeElement===auditDialogFocus&&!!document.activeElement.closest("[role=dialog]")'));
+ await tab.call('Input.dispatchKeyEvent',{type:'keyDown',key:'Escape',code:'Escape'});
  await tab.evaluate(`caches.open(${JSON.stringify(cache)}).then(c=>c.delete(${JSON.stringify(origin+release.base+'js/engine.js')}))`);
  const incomplete=await tab.evaluate(rpc({type:'STATUS'}));await tab.evaluate('ES.Offline.check();true');await tab.evaluate('ES.Offline.downloadAll()');const message=await tab.evaluate('document.querySelector(".offline-status").textContent');const still=await tab.evaluate(rpc({type:'STATUS'}));
- record('optional download never claims complete offline modes while core is missing',!message.includes('All artwork downloaded')||still.ok,{before:incomplete,after:still,message});await shot(tab,'false-offline-ready');
+ record('optional download never claims complete offline modes while core is missing',!incomplete.ok&&!still.ok&&still.artworkOk===true&&message.includes('Artwork downloaded.')&&message.includes('Repair offline files')&&!message.includes('available offline'),{before:incomplete,after:still,message});await shot(tab,'partial-eviction-message');
+ networkOnline=false;
+ const missingCore=await tab.evaluate(`fetch(${JSON.stringify(origin+release.base+'js/engine.js')},{cache:'no-store'}).then(r=>r.status)`);
+ record('partial eviction actually prevents offline core loading',missingCore===503,{status:missingCore});
+ networkOnline=true;
+ await tab.evaluate('ES.Offline.repair()');const repaired=await tab.evaluate(rpc({type:'STATUS'}));const readyMessage=await tab.evaluate('document.querySelector(".offline-status").textContent');
+ record('explicit core repair confirms current release and all artwork readiness',repaired.ok&&repaired.artworkOk&&repaired.id===release.id&&readyMessage.includes('all supported modes and artwork'),{repaired,readyMessage});
+ const spectator=await chrome.tab();await spectator.navigate(base+'?screen=settings');await until(()=>spectator.evaluate('ES?.UI?.current==="settings"&&!!navigator.serviceWorker.controller'),'spectator settings');
+ await spectator.evaluate('document.querySelector("#setOffline").click();ES.Offline.downloadAll()');
+ record('read-only spectator can inspect and download offline capabilities',await spectator.evaluate('!ES.Store.canEdit&&!document.querySelector(".offline-status").hidden&&document.querySelector(".offline-status").textContent.includes("all supported modes and artwork")'));
+ await spectator.evaluate('[...document.querySelectorAll(".offline-status button")].find(b=>b.textContent==="Save Recovery").click()');
+ record('spectator update panel preserves Save Recovery exports',await spectator.evaluate('!!document.querySelector("#saveStored")&&!!document.querySelector("#saveExport")&&document.activeElement.closest("[role=dialog]")!==null'));
+ await spectator.close();
  const failureEvents=chrome.events.filter(e=>e.method==='Runtime.exceptionThrown');errors.push(...failureEvents.map(e=>e.params.exceptionDetails));
  failedRequests.push(...requests.filter(x=>x.status>=400));
  const downloaded=(await import('node:fs')).readdirSync(out).filter(f=>f.endsWith('.json')&&f.startsWith('ember'));
  writeFileSync(resolve(out,'summary.json'),JSON.stringify({date:new Date().toISOString(),sha:execFileSync('git',['rev-parse','HEAD'],{cwd:root,encoding:'utf8',windowsHide:true}).trim(),release:release.id,browser,checks,labs,install:{ms:installMs,quota},errors,failedRequests,requests,downloaded,profile:chrome.profile},null,2));
- console.log('Audit probes complete: '+checks.filter(c=>c.status==='PASS').length+' PASS, '+checks.filter(c=>c.status==='FAIL').length+' reproduced FAIL observations (not fixes).');
-}catch(error){writeFileSync(resolve(out,'failure.json'),JSON.stringify({message:error.stack,checks,errors},null,2));try{await shot(page,'failure')}catch{}console.error(error);process.exitCode=1;}
-finally{await chrome?.close();server.close();}
+ console.log('Audit probes complete: '+checks.filter(c=>c.status==='PASS').length+' PASS, '+checks.filter(c=>c.status==='FAIL').length+' FAIL observations.');
+}catch(error){let state;try{state=await page.evaluate('({hidden:document.hidden,screen:ES?.UI?.current,motion:ES?.FX?.motion(),reduced:ES?.Store?.state.settings.reduced,draws:self.audit?.draws,opacity:document.querySelector("#emberField")?.style.opacity,active:document.activeElement?.outerHTML.slice(0,300)})')}catch{}writeFileSync(resolve(out,'failure.json'),JSON.stringify({message:error.stack,state,checks,errors},null,2));try{await shot(page,'failure')}catch{}console.error(error);process.exitCode=1;}
+finally{await motionChrome?.close();await chrome?.close();server.close();}

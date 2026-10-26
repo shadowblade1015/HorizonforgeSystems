@@ -164,13 +164,13 @@ self.addEventListener('message', event => {
     if (data.type === 'HELLO') { await pin(event.source.id, data.id); await retire(); reply({ ok: true, id: RELEASE.id }); return; }
     if (data.type === 'STATUS') {
       const stored = await cacheRelease(RELEASE.id);
-      let ok = !!stored;
-      if (stored) for (const f of RELEASE.files.filter(f => f.core)) {
+      let ok = !!stored, artworkOk = !!stored;
+      if (stored) for (const f of RELEASE.files) {
         const hit = await stored.cache.match(new URL(RELEASE.base + f.path, self.registration.scope).href);
-        if (!hit || hit.status !== 200 || hit.type === 'opaque') ok = false;
+        if (!hit || hit.status !== 200 || hit.type === 'opaque') { if (f.core) ok = false; else artworkOk = false; }
         if (hit) if (hit.body) void hit.body.cancel().catch(() => {});
       }
-      reply({ ok, id: RELEASE.id, legacyClients: await unknownClients(event.source.id) }); return;
+      reply({ ok, artworkOk, id: RELEASE.id, legacyClients: await unknownClients(event.source.id) }); return;
     }
     if (data.type === 'RETIRE') { await retire(); reply({ ok: true }); return; }
     if (data.type === 'REPAIR') { await install(); reply({ ok: true, id: RELEASE.id }); return; }

@@ -82,8 +82,62 @@ function client({legacy=false,bridge=false}={}) {
  h.context.navigator={serviceWorker:{controller:active,async register(){return reg;},addEventListener:(n,f)=>listeners.set(n,f)}};
  h.context.URL=URL;h.context.MessageChannel=Channel;h.context.location={protocol:'https:',origin:'https://test.invalid',search:'',reload(){reloads++;}};
  h.get('meta[name="ember-release"]').content=bridge?b:a;h.get('meta[name="ember-scope"]').content='/ember-solitaire/';h.load('offline');
- return {...h,api:h.context.ES.Offline,calls,reg,async takeover(){reg.waiting=null;h.context.navigator.serviceWorker.controller=waiting;listeners.get('controllerchange')();for(let i=0;i<20;i++)await Promise.resolve();},get reloads(){return reloads;}};
+ return {...h,active,api:h.context.ES.Offline,calls,reg,async takeover(){reg.waiting=null;h.context.navigator.serviceWorker.controller=waiting;listeners.get('controllerchange')();for(let i=0;i<20;i++)await Promise.resolve();},get reloads(){return reloads;}};
 }
+
+function capabilityClient({core=true,artwork=false,download=true,repair=true,wrong=false,silent=false}={}) {
+ const h=client();h.reg.waiting=null;let complete=artwork;
+ h.active.postMessage=(data,ports)=>{
+  h.calls.push(data);let reply={ok:true};
+  if(data.type==='STATUS'){if(silent)return;reply={ok:core,artworkOk:complete,id:(wrong?'b':'a').repeat(64)};}
+  if(data.type==='DOWNLOAD'){reply={ok:download};if(download)complete=true;}
+  if(data.type==='REPAIR'){reply={ok:repair};if(repair)core=true;}
+  ports?.[0]?.postMessage(reply);
+ };
+ return {...h,message:()=>h.document.querySelector('.offline-status').children[0].textContent};
+}
+test('STATUS separates core launch capability from optional artwork availability',async()=>{
+ const w=worker();await w.run('install');let s=(await w.run('message',{data:{type:'STATUS'}})).reply;
+ assert.equal(s.ok,true);assert.equal(s.artworkOk,false);
+ await w.run('message',{data:{type:'DOWNLOAD'}});s=(await w.run('message',{data:{type:'STATUS'}})).reply;assert.equal(s.artworkOk,true);
+ await(await w.storage.open(w.t.CACHE)).delete(new URL(w.release.base+'js/engine.js',scope).href);
+ s=(await w.run('message',{data:{type:'STATUS'}})).reply;assert.equal(s.ok,false);assert.equal(s.artworkOk,true);
+});
+for(const core of [true,false])for(const download of [true,false])test(`artwork download core=${core} success=${download} reports verified capability`,async()=>{
+ const h=capabilityClient({core,download});await h.api.start();await h.api.downloadAll();
+ assert.match(h.message(),core?(download?/all supported modes/:/Some optional artwork/):/Repair offline files/);
+ if(!core)assert.doesNotMatch(h.message(),/available offline|Offline ready:/);
+ assert.equal(h.calls.filter(c=>c.type==='STATUS').length,3);
+});
+test('core-ready initial status describes optional incompleteness and completed artwork separately',async()=>{
+ for(const artwork of [false,true]){const h=capabilityClient({artwork});await h.api.start();assert.match(h.message(),artwork?/all supported modes/:/Other artwork needs/);}
+});
+for(const repair of [true,false])test(`repair success=${repair} never invents readiness`,async()=>{
+ const h=capabilityClient({core:false,repair});await h.api.start();await h.api.repair();assert.match(h.message(),repair?/Offline ready:/:/could not complete/);
+});
+test('successful REPAIR acknowledgement still needs a fresh ready STATUS',async()=>{
+ const h=capabilityClient({core:false});const original=h.active.postMessage;
+ h.active.postMessage=(data,ports)=>data.type==='REPAIR'?ports[0].postMessage({ok:true}):original(data,ports);
+ await h.api.start();await h.api.repair();assert.match(h.message(),/Core offline files are incomplete/);
+});
+test('wrong-release STATUS refuses downloads and repair',async()=>{
+ const h=capabilityClient({wrong:true});await h.api.start();await h.api.downloadAll();assert.match(h.message(),/could not be verified/);await h.api.repair();
+ assert.equal(h.calls.some(c=>['DOWNLOAD','REPAIR'].includes(c.type)),false);
+});
+test('STATUS timeout cannot promise offline readiness',async()=>{
+ const h=capabilityClient();await h.api.start();h.active.postMessage=()=>{};
+ const pending=h.api.downloadAll();h.clock.advance(12001);await pending;assert.match(h.message(),/could not be verified/);assert.doesNotMatch(h.message(),/available offline/);
+});
+test('post-download STATUS failure preserves the download uncertainty instead of claiming all modes',async()=>{
+ const h=capabilityClient();await h.api.start();const original=h.active.postMessage;let downloaded=false;
+ h.active.postMessage=(data,ports)=>{if(data.type==='DOWNLOAD')downloaded=true;if(data.type==='STATUS'&&downloaded)ports[0].postMessage({id:'b'.repeat(64),ok:true,artworkOk:true});else original(data,ports);};
+ await h.api.downloadAll();assert.match(h.message(),/Artwork may have downloaded/);assert.doesNotMatch(h.message(),/available offline/);
+});
+test('Later integrates with shared focus restoration and retains polite status semantics',async()=>{
+ const h=capabilityClient();await h.api.start();const invoker=new h.Element('button');h.get('#scr-game').appendChild(invoker);invoker.focus();await h.api.check();
+ const banner=h.document.querySelector('.offline-status'),later=banner.children.find(b=>b.textContent==='Later');banner.contains=node=>banner.children.includes(node);
+ assert.equal(banner.children[0].getAttribute('role'),'status');later.focus();h.api.defer();assert.equal(banner.hidden,true);assert.equal(h.document.activeElement,invoker);assert.equal(h.reloads,0);assert.equal(h.calls.some(c=>c.type==='ACTIVATE'),false);
+});
 test('update deferral never reloads or activates; approval flushes save and holds input until own takeover',async()=>{const h=client();await h.api.start();assert.equal(h.api.target,'b'.repeat(64));h.api.defer();assert.equal(h.reloads,0);assert.equal(h.calls.some(c=>c.type==='ACTIVATE'),false);await h.api.approve();assert.equal(h.S.persistence.unsaved,false);assert.equal(h.debug.holds.size,1);await h.takeover();assert.equal(h.reloads,1);});
 test('failed save blocks activation/reload and releases the update hold',async()=>{const h=client();await h.api.start();assert.equal(h.api.target,'b'.repeat(64));h.context.localStorage.setItem=()=>{throw Error('Write denied');};assert.equal(await h.api.approve(),false);assert.equal(h.reloads,0);assert.equal(h.calls.some(c=>c.type==='ACTIVATE'),false);assert.equal(h.debug.holds.size,0);});
 test('another tab activating a worker never automatically reloads this tab',async()=>{const h=client();await h.api.start();await h.takeover();assert.equal(h.reloads,0);});

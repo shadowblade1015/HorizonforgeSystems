@@ -1,5 +1,22 @@
 # Phase 4 test matrix
 
+## October 26 Phase 4.2 revalidation
+
+| Current gate | Result |
+| --- | --- |
+| Before-edit reproduction | 304 Node / 13 mobile / 42 offline / 19 multi-tab pass; independent 19 PASS / original 3 FAIL |
+| Build / strict verification | PASS: 144 source / 277 generated, zero errors, unchanged historical archive/inventory |
+| All Node suites | **329 PASS**, zero failure/TODO/skip/cancellation |
+| Mobile / offline / multi-tab browser suites | **13 / 42 / 19 PASS**, all prior checks retained |
+| Independent generated-bundle browser assessment | **32 PASS / 0 FAIL**; all findings inspected; runtime errors and unexpected missing assets empty |
+| P4-03 partial eviction | PASS: core false + artwork true gives repair wording; disconnected engine fetch 503; explicit repair confirms both capabilities |
+| P4-04 dynamic motion | PASS actual draw counts stop/resume; in-game preference remains authoritative; deterministic stale RAF, toggles, visibility and lifecycle coverage |
+| P4-05 notice focus | PASS automatic/Settings, native keyboard Tab/Enter, navigation and modal isolation; polite status semantics retained |
+| Read-only updates / recovery | PASS actual spectator panel/artwork and export access; existing protected approval and persistence suites retained |
+| Deployment / physical devices / human AT / commercial-native gates | NOT TESTED or unresolved as previously recorded; no automatic GO |
+
+Evidence: `.phase2-backup/phase4-2/`, final independent summary `independent-validated/summary.json`. [P4_02_REMEDIATION_REPORT.md](P4_02_REMEDIATION_REPORT.md) identifies final versus development runs and the four accidentally replaced Phase 4.1 multi-tab artifacts. Original Phase 4 indexed evidence and remaining Phase 4.1 indexed files are unchanged. Historical tables below retain the audit's original outcomes.
+
 ## October 26 P4-01 revalidation
 
 The tables below preserve the original certification audit. The current focused follow-up is [P4_01_REMEDIATION_REPORT.md](P4_01_REMEDIATION_REPORT.md), with evidence under `.phase2-backup/phase4-1/` and a preserved original evidence copy at `baseline-phase4/`.

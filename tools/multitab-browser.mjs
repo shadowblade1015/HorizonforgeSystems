@@ -4,7 +4,7 @@ import {mkdirSync,writeFileSync} from 'node:fs';
 import {resolve,extname} from 'node:path';
 import {readTree,root} from './verify-source.mjs';
 import {chromeAudit,until} from './chrome-audit.mjs';
-const out=resolve(root,'.phase2-backup/phase4-1/multitab');mkdirSync(out,{recursive:true});
+const out=resolve(root,process.env.HFS_MULTITAB_EVIDENCE||'.phase2-backup/multitab-browser');mkdirSync(out,{recursive:true});
 const files=readTree(resolve(root,'dist')),checks=[];
 const server=createServer((req,res)=>{const u=new URL(req.url,'http://localhost'),p=u.pathname.slice(1)+(u.pathname.endsWith('/')?'index.html':'');const b=files.get(p);res.writeHead(b?200:404,{'Cache-Control':'no-store','Content-Type':({'.html':'text/html','.js':'text/javascript','.css':'text/css','.webmanifest':'application/manifest+json','.woff2':'font/woff2','.png':'image/png','.webp':'image/webp'})[extname(p)]||'application/json'});res.end(b||'Not found')});
 await new Promise(r=>server.listen(0,'127.0.0.1',r));const base='http://127.0.0.1:'+server.address().port+'/ember-solitaire/';let chrome,a,b;

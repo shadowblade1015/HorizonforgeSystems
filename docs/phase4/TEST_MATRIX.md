@@ -1,5 +1,22 @@
 # Phase 4 test matrix
 
+## October 26 Phase 4.3 revalidation
+
+| Current gate | Result |
+| --- | --- |
+| Integrated starting branch | Fetched/fast-forwarded release candidate `977e5d3`, verified Phases 4.1/4.2, new `fix/ember-p4-03-solver`; production main unchanged |
+| Preserved pre-change baseline | 329 Node / 32 independent browser PASS; actual Board search 286.9 ms / 2,316.6 ms, normal / 4× |
+| Build / strict source verification | PASS: 144 source / 277 generated, 74 core; zero errors; archive and baseline inventory unchanged |
+| All Node suites | **352 PASS**, zero failure/TODO/skip/cancellation; 19 captured recursive planner outcomes match |
+| New actual solver browser suite | **24/24 PASS**: real worker results, hard bounded no-plan, startup/crash/deadline, cancellation/queued old callbacks, alternate revision, spectator and exactly-once victory |
+| Prior mobile / offline / multi-tab | **13 / 46 / 19 PASS**; offline includes all prior 42 plus four endgame immutable-engine checks |
+| Independent generated-bundle browser suite | **34 PASS / 0 FAIL**, previous 32 plus two immutable Board-worker/main-thread assertions |
+| Scheduled Board-path responsiveness | Zero synchronous search calls; maximum RAF gap **33.4 ms normal / 50.0 ms at 4×**, versus 283.2 / 2,499.8 baseline |
+| Render/device limits | Separate dedicated normal stress sample has 499.9 ms RAF gap without JS long task; rendering/setup long tasks and physical-device follow-up remain open |
+| Deployment / human AT / native-commercial gates | No new certification, deployment or waiver; previous uncollected gates remain |
+
+Final evidence: `.phase2-backup/phase4-3/validated/`. The original baseline and failed development attempts are separately retained. [P4_03_REMEDIATION_REPORT.md](P4_03_REMEDIATION_REPORT.md) distinguishes worker compute, message latency and main-thread responsiveness; no field INP claim. Earlier tables below remain historical.
+
 ## October 26 Phase 4.2 revalidation
 
 | Current gate | Result |

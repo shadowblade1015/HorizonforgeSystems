@@ -51,7 +51,19 @@ export function lifecycleHarness(options={}) {
     querySelector(s){if(s.startsWith('.'))return descendants(app).find(n=>s.split(',').some(c=>n.classList.contains(c.trim().slice(1))))||null;return get(s);},
     querySelectorAll:s=>s==='#gSets .pip'?pips:[],addEventListener:(k,fn)=>listen(docEvents,k,fn),removeEventListener:(k,fn)=>docEvents.get(k)?.delete(fn)};
   const workers=[];
-  class Worker {constructor(){this.requests=[];workers.push(this);}postMessage(d){this.requests.push(d);}terminate(){this.terminated=true;}}
+  class Worker {
+    constructor(){this.requests=[];workers.push(this);}
+    postMessage(d){
+      const payload=JSON.parse(JSON.stringify(d));this.requests.push(payload);
+      if(options.autocomplete&&!options.manualWorker&&d.type==='endgame')clock.setTimeout(()=>{
+        if(this.terminated)return;
+        const self={ES:{Engine:h.E},postMessage:data=>this.onmessage?.({data})};
+        vm.runInNewContext(readFileSync(new URL('../site/ember-solitaire/js/stuck-worker.js',import.meta.url),'utf8'),{self,importScripts(){},performance:{now:()=>clock.now}});
+        self.onmessage({data:payload});
+      },0);
+    }
+    terminate(){this.terminated=true;}
+  }
   const h=harness(null,{globals:{document,performance:{now:()=>clock.now},setTimeout:clock.setTimeout,clearTimeout:clock.clearTimeout,setInterval:clock.setInterval,clearInterval:clock.clearInterval,requestAnimationFrame:clock.requestAnimationFrame,cancelAnimationFrame:clock.cancelAnimationFrame,addEventListener:(k,fn)=>listen(windowEvents,k,fn),Worker,innerWidth:1000,innerHeight:700}});
   const es=h.context.ES;
   es.Audio={play:n=>events.push(['audio',n]),haptic(){},unlock(){},apply(){}};

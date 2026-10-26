@@ -220,3 +220,33 @@ git status --short
 The independent runner still records findings rather than treating exit zero as certification: inspect every `checks` entry in `summary.json`, plus errors and failed requests. Its media probe requests a rendering frame to flush headless CDP emulation, observes actual draw counts, and runs separately from heap profiling. Keyboard Enter includes its native text payload. Partial eviction uses a real worker with server-side network disconnection (tab network emulation alone did not cut off worker fetches), expects 503, then verifies explicit repair. No production refresh function or draw-count replacement is used to simulate media change.
 
 The Phase 4 and Phase 4.1 results above are historical. The initial baseline multi-tab invocation accidentally replaced four historical Phase 4.1 output files through its old default path; see the explicit deviation in [P4_02_REMEDIATION_REPORT.md](phase4/P4_02_REMEDIATION_REPORT.md). Original hashes remain in the old index; they were not rewritten to conceal the mismatch. Multi-tab and independent runner defaults now use generic scratch directories; all four runners support explicit evidence destinations. The final Phase 4.2 outputs are separately indexed, including failed development attempts. No archive, save/lock schema, engine/reward rule, production deployment or source-control history was changed. Solver work remains Phase 4.3 and overall launch remains NO-GO pending the report's remaining gates.
+
+## Phase 4.3 asynchronous solver gate
+
+Start from the integrated release candidate; this work is on `fix/ember-p4-03-solver` based on `977e5d3`. Final results: **352 Node tests; 24 solver, 13 mobile, 46 offline, 19 multi-tab and 34 independent browser checks pass**. Original 329 regression cases remain. The previous fallback test now requires conservative refusal instead of synchronous main-thread search. Nineteen pre-change recursive planner outputs in `tests/fixtures/endgame-plans.json` preserve exact plans and node-budget boundaries.
+
+Choose a fresh evidence suffix for subsequent runs so these results remain historical:
+
+```powershell
+$env:HFS_SOLVER_EVIDENCE='.phase2-backup/phase4-3/validated/solver'
+$env:HFS_MOBILE_EVIDENCE='.phase2-backup/phase4-3/validated/mobile'
+$env:HFS_OFFLINE_EVIDENCE='.phase2-backup/phase4-3/validated/offline'
+$env:HFS_MULTITAB_EVIDENCE='.phase2-backup/phase4-3/validated/multitab'
+$env:HFS_PHASE4_EVIDENCE='.phase2-backup/phase4-3/validated/independent'
+node build.mjs
+node tools/verify-source.mjs
+node --test
+node tools/solver-browser.mjs
+node tools/mobile-browser.mjs after
+node tools/offline-browser.mjs
+node tools/multitab-browser.mjs
+node tools/phase4-browser.mjs
+git diff --check
+git status --short
+```
+
+Build before the complete Node suite: strict verifier tests deliberately compare generated release bytes with tracked source and reject stale dist. Run performance browser tools without concurrent heavy test workloads when comparing timings. Inspect every independent `checks` entry and error/missing-asset array; process exit zero alone is not a passing assessment. CPU emulation targets the page and is not a uniform worker/GPU/physical-device simulation.
+
+`tools/solver-browser.mjs` serves generated immutable output with actual workers and Board lifecycle. It exercises hard bounded no-plan, near-win legal execution/one settlement, a legally advanced position, native worker crash/initialization/hang faults, the four-second deadline, queued obsolete callbacks, restart/navigation/undo-alternate/pause/abandonment, repeated checks and a read-only secondary tab. Its injected faults exist only in the browser driver. Worker replies cannot bypass Store writer ownership, position revision or per-step legality. Existing offline checks now also verify endgame replies from matching A/B engine imports, retaining all previous 42 checks.
+
+The original 287 / 2,317 ms main-thread baseline is retained under `.phase2-backup/phase4-3/baseline/`. The final independent Board sample has zero synchronous searches and maximum RAF gaps 33.4 / 50.0 ms. A separate dedicated normal stress sample still has a 499.9 ms RAF gap without a matching JS long task, and render/setup long tasks remain. Preserve these limits; do not present the numbers as field INP or physical-device certification. Details, complete changed-file list and remaining launch gates: [P4_03_REMEDIATION_REPORT.md](phase4/P4_03_REMEDIATION_REPORT.md) and [PERFORMANCE_REPORT.md](phase4/PERFORMANCE_REPORT.md).

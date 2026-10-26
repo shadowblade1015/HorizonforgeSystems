@@ -245,3 +245,8 @@ img, svg { display: block; }
  .hdr .ttl { grid-column: 1 / -1; grid-row: 1; overflow-wrap: normal; }
  .hdr > .icon-btn, .hdr > span { grid-row: 2; }
 }
+
+.offline-status { position: fixed; z-index: 54; bottom: calc(72px + var(--safe-bottom)); left: 3%; width: 94%; max-height: 40dvh; overflow: auto; padding: 12px; display: flex; flex-wrap: wrap; gap: 8px; background: #15191d; color: #f3eee4; border: 1px solid #d9a15d; border-radius: 10px; font-size: 13px; }
+.offline-status[hidden], .offline-status [hidden] { display: none; }
+.offline-status > span { flex-basis: 100%; }
+.offline-status .btn { min-height: 44px; padding: 8px 12px; font-size: 12px; }

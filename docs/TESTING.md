@@ -1,6 +1,6 @@
 # Testing, source ownership and recovery
 
-October 23, 2026. Node 24 is the tested baseline. Built-in Node modules only; no install step.
+Updated October 25, 2026. Node 24 is the tested baseline. Built-in Node modules only; no install step. Earlier phase counts below are historical execution records; current Phase 3F results appear at the end.
 
 ## Structure and commands
 
@@ -18,7 +18,7 @@ The engine/persistence regression suites load `site/` directly and require no bu
 
 ## Build and verification
 
-The build resolves paths relative to its script, snapshots regular source files, writes a fresh unique staging directory and validates it before publishing. Validation checks byte parity against current `site/`, JavaScript syntax, JSON, routes, local references, generated card paths and service-worker precache paths. Symlinks, special files and empty trees are rejected. The original archive must retain SHA-256 `e6c378cab4ef0d92b122ec4f725a2a728bb1001e002b022755e1743e53f84291`; its USTAR integrity checks remain active. Historical archive equality is reported as `baselineMatching`, while current source/output equality is enforced. Future approved source edits need not equal the historical application.
+The build resolves paths relative to its script, snapshots regular source files, generates a content-derived game release with `tools/release.mjs`, writes a fresh unique staging directory and validates it before publishing. Validation checks every path and byte against the exact generated map from current `site/`, JavaScript syntax, JSON, routes, local references, generated card paths and service-worker core catalog paths. Missing, extra and edited output remain errors. Generated root wrappers, immutable release files and catalogs are intentional output rather than extra editable sources. Symlinks, special files and empty trees are rejected. The original archive must retain SHA-256 `e6c378cab4ef0d92b122ec4f725a2a728bb1001e002b022755e1743e53f84291`; its USTAR integrity checks remain active. Historical source equality is reported as `baselineMatching`; approved source edits need not equal the historical application.
 
 The verifier retains the original dist-relative inventory key format for direct comparison with `docs/BASELINE_INVENTORY.json`. That document is immutable historical evidence, including its original build/config hashes. Do not overwrite it with the new build hash.
 
@@ -30,7 +30,7 @@ Static reference inspection has the same Phase 1 limits: tailored literal parsin
 
 `vercel.json` is unchanged: Other framework, no installation, `node build.mjs`, output `dist`, existing trailing slashes and headers. A checkout containing site, tools, archive and configuration builds with Node alone. Nothing was deployed.
 
-Source rollback: preserve current edits, restore a reviewed prior `site/` revision, then build and verify. Output rollback: with no build running, preserve current dist under a new name and rename the chosen `.dist-backup-*` to dist. Do not rebuild immediately unless source also matches the desired release. For an interrupted build, inspect staging/backups, restore the desired output, and remove the lock only after confirming no builder is active.
+Source rollback: preserve current edits, restore reviewed `site/` and matching build/generator/worker-protocol tooling, then build and verify. After Phase 3F, do not deploy a pre-3F worker as a production rollback: its cleanup and unversioned dependencies are incompatible with the new release policy. Follow [PHASE_3F_REPORT.md](PHASE_3F_REPORT.md) for safe compatible release rollback. Output rollback: with no build running, preserve current dist under a new name and rename the chosen `.dist-backup-*` to dist. Do not rebuild immediately unless source/tooling also match the desired release. For an interrupted build, inspect staging/backups, restore the desired output, and remove the lock only after confirming no builder is active.
 
 Historical archive recovery: work in a disposable copy of the repository. Use the retained strict parser to write archive entries into a NEW recovery directory (never over edited site or dist):
 
@@ -49,7 +49,7 @@ for (const [p, content] of archiveFiles(bytes)) {
 }
 ```
 
-Compare the recovered 143 files to the historical inventory before selecting them as site in the disposable copy; build and run all checks there. The migration's local `.phase2-backup/` additionally preserves original dist, archive, build script and preflight report. Original build extraction must only be run in a disposable directory because it overwrites existing output. Never erase player localStorage or roll back save data to roll back application files.
+Compare the recovered 143 files to the historical inventory in the disposable copy. To execute that historical application/build, use its matching historical tooling there; the current compiler requires its new worker template. This is forensic recovery, not a production worker rollback. The migration's local `.phase2-backup/` additionally preserves original dist, archive, build script and preflight report. Original build extraction must only be run in a disposable directory because it overwrites existing output. Never erase player localStorage or roll back save data to roll back application files.
 
 ## Validation record
 
@@ -139,3 +139,25 @@ The optional `node tools/mobile-browser.mjs after` audit uses built-in Node modu
 Build/verifier: 143 matching source/output files, zero errors; 129 retain historical archive bytes. Archive/inventory, engine/save/settlement semantics, artwork and Vercel/service-worker configuration are unchanged. Touch scrolling is the default; deliberately enable Touch: drag for touch dragging. Visible numbered columns and More/Fewer/Cancel controls supplement keyboard shortcuts and preserve accessible alternatives without a broad application role.
 
 Executed browser: headless Chrome 155.0.8059.86 on Windows with viewport/touch emulation. This does not certify physical Safari/Android behavior, screen-reader speech, OS large text, real browser toolbar zoom or WCAG conformance. The remaining release checks and exact evidence paths are in [PHASE_3E_REPORT.md](PHASE_3E_REPORT.md) and [MOBILE_TEST_MATRIX.md](MOBILE_TEST_MATRIX.md).
+
+## Phase 3F offline and release validation
+
+Run all five required commands: `node build.mjs`, `node tools/verify-source.mjs`, `node --test`, `git diff --check`, `git status --short`. Current suite: **277 tests, 277 pass, zero failures/TODOs/skips/cancellations**, including all prior 245. `tests/offline.test.mjs` adds 32 deterministic generator/worker/update tests. Engine/store regressions still read tracked source independently of dist; build/verifier integration tests regenerate and compare the approved output format. Build tests include a disposable checkout with no dist, a different working directory, stale removal/backup, validation refusal and lock protection.
+
+Run the release-blocking browser suite separately:
+
+```powershell
+node tools/offline-browser.mjs
+```
+
+It needs installed Chrome (default Windows path, or CHROME_PATH), Node 24, a loopback port and permission to launch the browser. It installs no packages. Its fresh temporary profile never touches a normal player profile. The local server switches generated A/B/C/D releases on the same origin. A separate isolated partition runs the actual historical archived worker, then upgrades at that same origin. A different-origin preview is not equivalent evidence.
+
+Final browser result: **41 passing checks**, Windows headless Chrome 155.0.8059.86. Loaded scripts/CSS are checked by immutable URL, byte hash and runtime marker; an actual dedicated worker reports its engine identity. Checks include offline core/root/index/privacy/unknown routes, deferred unfinished-hand upgrade, failed protected save, old A under B control, native Chromium quota exhaustion, injected actual-worker Cache.put failure, optional HTTP 404/500, partial/whole eviction repair, failed/interrupted installation, cache retirement, unrelated-cache retention, protected historical migration with saved progress/recovery, and same-document skip-link focus. Fault injection is distinguished from native quota behavior. No production game markers are added.
+
+Ignored evidence: `.phase2-backup/phase3f-browser/summary.json`, `browser.json`, screenshots `a-offline.png`, `update-save-blocked.png`, `legacy-upgraded-b.png`; unsuccessful runs write `failure.json`/`failure.png` which may remain from earlier attempts. Node/verifier logs are `.phase2-backup/phase3f-node-tests.txt` and `phase3f-verification.json`. The tracked harness reproduces the evidence; it exits nonzero on a failed assertion and closes its isolated browser.
+
+Final build/verifier: **277 exact generated files from 144 source files**, 44 syntax checks, five JSON checks, 500 references, 74 core entries / **2,624,670 bytes**, nine routes, zero errors. Historical archive/inventory remain immutable; 128 original source files still match archive bytes. The ID hashes relevant source and compiler content, so subsequent source edits intentionally change it. Repeat builds with unchanged inputs retain the same paths/bytes.
+
+Default spades, default back/iron table, fonts and required forge environments form the core. Other suits/themes/high-resolution art require on-demand caching or explicit Download all artwork for that release. Settings > Offline & Updates exposes approval/deferral, repair and Save Recovery. Browser eviction can remove offline capability; matching online repair restores current files, while absent old deployed bytes fail closed. Neither caching nor update compatibility solves multi-tab progression conflicts. Never clear site/player data as an update step.
+
+The same-origin Chrome gate passes. Physical Safari/installed-PWA/Android lifecycle, screen-reader announcements, OS storage pressure and real Vercel routing/headers still need manual production approval checks. Read [OFFLINE_RELEASE_MATRIX.md](OFFLINE_RELEASE_MATRIX.md) for exact promises and [PHASE_3F_REPORT.md](PHASE_3F_REPORT.md) for first-migration, retention, compatible rollback and release-readiness details. No commit, merge, push or deployment was performed.

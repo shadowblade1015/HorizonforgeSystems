@@ -5,6 +5,7 @@ import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import vm from 'node:vm';
+import { generate } from './release.mjs';
 
 export const root = fileURLToPath(new URL('../', import.meta.url));
 export const hash = b => createHash('sha256').update(b).digest('hex');
@@ -53,7 +54,8 @@ export function readTree(directory) {
 export function verify(base = root, { output = resolve(base, "dist") } = {}) {
   const errors = [], archive = readFileSync(resolve(base, 'site-source.tar.gz')), historical = archiveFiles(archive);
   if (hash(archive) !== 'e6c378cab4ef0d92b122ec4f725a2a728bb1001e002b022755e1743e53f84291') errors.push('Historical archive hash changed');
-  const files = new Map([...readTree(resolve(base, 'site'))].map(([p, b]) => ['dist/' + p, b]));
+  const source = readTree(resolve(base, 'site')), generated = generate(source);
+  const files = new Map([...generated.output].map(([p, b]) => ['dist/' + p, b]));
   const disk = new Map([...readTree(output)].map(([p, b]) => ['dist/' + p, b]));
   const diskPath = p => resolve(output, p.slice(5));
   let matching = 0;
@@ -68,7 +70,9 @@ export function verify(base = root, { output = resolve(base, "dist") } = {}) {
     ref = ref.trim().replace(/&amp;/g, '&');
     if (!ref || /^(?:[a-z][\w+.-]*:|\/\/|#)/i.test(ref)) return;
     try {
-      const url = new URL(ref, 'https://local.invalid/' + from.slice(5));
+      const origin = 'https://local.invalid/' + from.slice(5);
+      const baseHref = from.endsWith('.html') ? disk.get(from)?.toString().match(/<base href="([^"]+)"/)?.[1] : null;
+      const url = new URL(ref, baseHref ? new URL(baseHref, origin) : origin);
       let p = 'dist' + decodeURIComponent(url.pathname);
       if (p.endsWith('/')) p += 'index.html';
       if (!disk.has(p) && disk.has(p + '/index.html')) p += '/index.html';
@@ -92,18 +96,15 @@ export function verify(base = root, { output = resolve(base, "dist") } = {}) {
     if (p.endsWith('.js') && !p.endsWith('/sw.js')) {
       // Literal browser asset paths; dynamic card paths are enumerated below.
       for (const m of text.replace(/\/\*[\s\S]*?\*\//g, '').matchAll(/["']((?:\.?\.?\/|assets\/|js\/|css\/)[^"'\n]+\.(?:js|css|webp|png|woff2|html|webmanifest))["']/g)) {
-        reference(p.startsWith('dist/ember-solitaire/js/') && !p.endsWith('stuck-worker.js') ? 'dist/ember-solitaire/index.html' : p, m[1]);
+        reference(/^dist\/ember-solitaire\/(?:_releases\/[a-f0-9]{64}\/)?js\//.test(p) && !p.endsWith('stuck-worker.js') ? p.replace(/js\/[^/]+$/, 'index.html') : p, m[1]);
       }
     }
   }
   json++; try { JSON.parse(readFileSync(resolve(base, 'vercel.json'), 'utf8')); } catch (e) { errors.push('JSON: vercel.json: ' + e.message); }
   const buildCheck = spawnSync(process.execPath, ['--check', resolve(base, 'build.mjs')], { encoding: 'utf8' });
   syntax++; if (buildCheck.status !== 0) errors.push('Syntax: build.mjs');
-  const sw = disk.get('dist/ember-solitaire/sw.js')?.toString();
-  const match = sw?.match(/const CORE\s*=\s*(\[[\s\S]*?\]);/);
-  let precache = 0;
-  if (!match) errors.push('Cannot inspect service worker CORE');
-  else { const core = JSON.parse(match[1]); precache = core.length; for (const r of core) reference('dist/ember-solitaire/sw.js', r); }
+  const precache = generated.release.files.filter(f => f.core).length;
+  for (const entry of generated.release.files) reference('dist/ember-solitaire/sw.js', generated.release.base + entry.path);
   const context = vm.createContext({});
   vm.runInContext(disk.get('dist/ember-solitaire/js/manifest.js').toString(), context, { timeout: 1000 });
   for (const s of ['S', 'H', 'D', 'C']) for (let r = 1; r <= 13; r++) for (const hi of [false, true]) reference('dist/ember-solitaire/index.html', context.ES.Manifest.card(r, s, hi));
@@ -111,7 +112,7 @@ export function verify(base = root, { output = resolve(base, "dist") } = {}) {
   for (const r of routes) reference('dist/index.html', r);
   const inventory = [...files].sort(([a], [b]) => a.localeCompare(b, 'en')).map(([path, b]) => ({ path, bytes: b.length, sha256: hash(b) }));
   const sourceHashes = Object.fromEntries(['build.mjs', 'vercel.json'].map(p => [p, hash(readFileSync(resolve(base, p)))]));
-  return { sourceHashes, archiveSha256: hash(archive), inventorySha256: hash(JSON.stringify(inventory)), matching, archiveFiles: historical.size, sourceFiles: files.size, baselineMatching: [...historical].filter(([p, b]) => files.get(p)?.equals(b)).length, extractedFiles: disk.size, syntax, json, references, precache, routes: routes.length, errors, inventory };
+  return { sourceHashes, archiveSha256: hash(archive), inventorySha256: hash(JSON.stringify(inventory)), matching, archiveFiles: historical.size, release: generated.release.id, coreBytes: generated.release.files.filter(f=>f.core).reduce((n,f)=>n+f.bytes,0), sourceFiles: source.size, baselineMatching: [...historical].filter(([p, b]) => source.get(p.slice(5))?.equals(b)).length, extractedFiles: disk.size, syntax, json, references, precache, routes: routes.length, errors, inventory };
 }
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   try { const result = verify(); console.log(JSON.stringify(result, null, 2)); if (result.errors.length) process.exitCode = 1; }

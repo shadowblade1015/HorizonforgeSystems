@@ -18,6 +18,11 @@
     document.querySelector('#btnHint .i-hint').outerHTML = UI.I('hint');
     document.querySelector('#btnFinish .i-finish').outerHTML = UI.I('sets');
     ES.Board.mount();
+    // Generated release bases must not turn the local skip link into navigation.
+    document.querySelector('.skip-board')?.addEventListener('click', event => {
+      event.preventDefault();
+      document.getElementById('board').focus();
+    });
     ES.Board.onWin = (g, out) => ES.Ceremony.victory(g, out);
     ES.Board.onStuck = g => ES.Screens.stuckSheet(g);
     ES.Analytics.setKey('build', ES.Build.version + '+' + ES.Build.versionCode);
@@ -37,9 +42,7 @@
     if (St.state.game) M.preload(M.cardUrls(St.state.game.suits));
 
     splash();
-    if ('serviceWorker' in navigator && !root.Capacitor && /^https?:/.test(location.protocol) && !/[?&]nosw/.test(location.search)) {
-      navigator.serviceWorker.register('sw.js').catch(() => {});
-    }
+    if (ES.Offline) ES.Offline.start();
   }
 
   function splash() {

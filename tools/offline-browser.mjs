@@ -46,6 +46,8 @@ async function identities(tab,release,label){
  check('actual loaded '+label+' scripts and CSS identities',details.ok&&details.engine===label&&details.css===label,details);
  const worker=await tab.evaluate(`new Promise((resolve,reject)=>{const w=new Worker(new URL('js/stuck-worker.js',document.baseURI));w.onmessage=e=>{w.terminate();resolve(e.data)};w.onerror=e=>reject(Error(e.message));w.postMessage({id:9,session:8,revision:7,cols:ES.Store.state.game.cols,stock:ES.Store.state.game.stock,completed:ES.Store.state.game.completed});})`);
  check('dedicated worker imports '+label+' engine',worker.engineRelease===label&&worker.id===9&&worker.revision===7,worker);
+ const plan=await tab.evaluate(`new Promise((resolve,reject)=>{const w=new Worker(new URL('js/stuck-worker.js',document.baseURI)),cards=ES.Engine.newDeck(1,()=>0).filter(c=>parseInt(c.id.slice(1),36)<13).sort((a,b)=>b.rank-a.rank);cards.forEach(c=>c.up=true);const cols=[cards.slice(0,12),[cards[12]],...Array.from({length:8},()=>[])];const timer=setTimeout(()=>{w.terminate();reject(Error('Offline endgame timeout'))},8000);w.onmessage=e=>{clearTimeout(timer);w.terminate();resolve(e.data)};w.onerror=e=>{clearTimeout(timer);w.terminate();reject(Error(e.message))};w.postMessage({type:'endgame',id:10,session:8,revision:7,workEpoch:6,cols,stock:[],completed:7});})`);
+ check('offline-capable endgame worker uses '+label+' immutable engine',plan.engineRelease===label&&plan.type==='endgame'&&plan.id===10&&plan.workEpoch===6&&plan.status==='solved'&&plan.plan.length===1,plan);
 }
 try {
  chrome=await chromeAudit();const browser=await chrome.send('Browser.getVersion');writeFileSync(resolve(out,'browser.json'),JSON.stringify(browser,null,2));

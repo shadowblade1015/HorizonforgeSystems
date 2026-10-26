@@ -267,30 +267,35 @@
     if (!canAutoComplete(g)) return null;
     limit = limit || 20000;
     const seen = new Set(); let nodes = 0;
-    function dfs(s, path) {
-      if (s.completed >= 8) return path;
-      if (++nodes > limit) return null;
-      const k = key(s); if (seen.has(k)) return null; seen.add(k);
-      const ms = legalMoves(s).map(m => {
-        const run = s.cols[m[0]][m[1]], dest = s.cols[m[2]], top = dest[dest.length - 1];
-        let sc = 0;
-        if (top && top.suit === run.suit) sc += 50 + (s.cols[m[0]].length - m[1]);
-        if (!dest.length) sc -= 20;
-        if (m[1] === 0) sc += 15;
-        const below = s.cols[m[0]][m[1] - 1];
-        if (below && below.suit === run.suit && below.rank === run.rank + 1) sc -= 60;  // breaking a built run
-        return { m, sc };
-      }).sort((a, b) => b.sc - a.sc);
-      for (const { m } of ms) {
+    // Explicit DFS frames preserve traversal/tie order without depending on the
+    // smaller call stack of a worker. One path avoids recursive path copies.
+    const stack = [{ s: lite(g) }], path = [];
+    while (stack.length) {
+      const frame = stack[stack.length - 1], s = frame.s;
+      if (!frame.moves) {
+        if (s.completed >= 8) return path.slice();
+        if (++nodes > limit) return null;
+        const k = key(s); if (seen.has(k)) { stack.pop(); path.pop(); continue; } seen.add(k);
+        frame.moves = legalMoves(s).map(m => {
+          const run = s.cols[m[0]][m[1]], dest = s.cols[m[2]], top = dest[dest.length - 1];
+          let sc = 0;
+          if (top && top.suit === run.suit) sc += 50 + (s.cols[m[0]].length - m[1]);
+          if (!dest.length) sc -= 20;
+          if (m[1] === 0) sc += 15;
+          const below = s.cols[m[0]][m[1] - 1];
+          if (below && below.suit === run.suit && below.rank === run.rank + 1) sc -= 60;  // breaking a built run
+          return { m, sc };
+        }).sort((a, b) => b.sc - a.sc);
+        frame.next = 0;
+      }
+      if (frame.next < frame.moves.length) {
+        const { m } = frame.moves[frame.next++];
         const n = { cols: s.cols.map(c => c.slice()), stock: [], completed: s.completed };
         applyLite(n, m[0], m[1], m[2]);
-        const r = dfs(n, path.concat([{ from: m[0], idx: m[1], to: m[2] }]));
-        if (r) return r;
-        if (nodes > limit) return null;
-      }
-      return null;
+        path.push({ from: m[0], idx: m[1], to: m[2] }); stack.push({ s: n });
+      } else { stack.pop(); path.pop(); }
     }
-    return dfs(lite(g), []);
+    return null;
   }
 
   // Dead end: no deal possible and no sequence of up to `depth` legal moves leads to

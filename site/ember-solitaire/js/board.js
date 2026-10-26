@@ -69,8 +69,10 @@
     if (!preserveAuto) cancelAutoComplete();
     for (const cancel of [...owned]) cancel();
     for (const node of ghosts) node.remove(); ghosts.clear();
-    if (worker) { worker.onmessage = worker.onerror = null; worker.terminate(); worker = null; }
+    if (pendingMap.size) B.searchStatus = { state: 'cancelled', session, revision };
+    if (worker) { worker.onmessage = worker.onerror = worker.onmessageerror = null; worker.terminate(); worker = null; }
     pendingMap.clear(); ++checkId;
+    B.stuckCheckedAt = null;
     if (B.drag && B.el) { try { B.el.releasePointerCapture(B.drag.id); } catch (e) {} }
     B.drag = null; rafMove = 0; lastEv = null;
     B.el && B.el.classList.remove('is-dragging');
@@ -462,45 +464,80 @@
     cancelLater(endT);
     endT = later(endgameChecks, motion() ? 650 : 60);
   }
+  function usablePlan(g, plan) {
+    const column = n => Number.isInteger(n) && n >= 0 && n < 10;
+    return Array.isArray(plan) && plan.length > 0 && plan.length <= 20000 &&
+      plan.every(m => m && column(m.from) && column(m.to) && Number.isInteger(m.idx) && m.idx >= 0) &&
+      E().canMove(g, plan[0].from, plan[0].idx, plan[0].to);
+  }
   function endgameChecks() {
     const g = B.g; if (!eligible() || B.autoRunning) return;
+    if (pendingMap.size) return;
     // auto-complete
     const fin = $('#btnFinish');
     let plan = null;
     if (ES.Config.bool('autocomplete_enabled') && E().canAutoComplete(g)) {
-      if (B.planFor !== revision) { B.plan = E().solveEndgame(g, 20000); B.planFor = revision; }
+      if (B.planFor !== revision) {
+        B.planFor = revision; fin.hidden = true;
+        search('endgame', data => {
+          const plan = data.plan;
+          if (data.status === 'solved' && !usablePlan(g, plan)) { failSearch(worker, 'unavailable'); return; }
+          B.plan = data.status === 'solved' ? plan : null;
+          fin.hidden = !B.plan;
+          if (B.plan) announce('Auto-complete is available. Choose Finish to play the suggested moves.');
+          else { announce('No auto-complete plan found within the search budget. You can keep playing manually.'); endgameChecks(); }
+        });
+        return;
+      }
       plan = B.plan;
     }
     fin.hidden = !plan;
     if (plan) return;
     // dead end: only meaningful once the stock can't help
-    if (!ES.Config.bool('stuck_prompt_enabled') || E().canDeal(g).ok || B.stuckShownAt === revision) return;
-    if (pendingMap.size) return;
-    const token = capture(), id = ++checkId, snap = { id, session, revision, cols: g.cols, stock: g.stock, completed: g.completed };
-    const verdict = stuck => { if (!isCurrent(token) || !eligible() || stuck !== true) return; B.stuckShownAt = revision; B.onStuck && B.onStuck(g); };
+    if (!ES.Config.bool('stuck_prompt_enabled') || E().canDeal(g).ok || B.stuckShownAt === revision || B.stuckCheckedAt === revision) return;
+    B.stuckCheckedAt = revision;
+    search('stuck', data => { if (data.stuck !== true) return; B.stuckShownAt = revision; B.onStuck && B.onStuck(g); });
+  }
+  function failSearch(source, state) {
+    if (source !== worker) return;
+    for (const entry of pendingMap.values()) cancelLater(entry.timeout);
+    pendingMap.clear();
+    if (worker) { worker.onmessage = worker.onerror = worker.onmessageerror = null; worker.terminate(); worker = null; }
+    B.stuckCheckedAt = revision;
+    B.searchStatus = { state, session, revision };
+    if (eligible()) {
+      const message = state === 'timeout' ? 'Automatic search reached its time limit. You can keep playing manually.' : 'Automatic search is unavailable. You can keep playing manually.';
+      announce(message); ES.UI.toast(message);
+    }
+  }
+  function search(type, verdict) {
+    const g = B.g, token = capture(), id = ++checkId;
+    const snap = { type, id, session, revision, workEpoch, cols: g.cols, stock: g.stock, completed: g.completed };
+    B.searchStatus = { state: 'searching', type, id, session, revision };
     try {
-      if (!worker && typeof Worker !== 'undefined') {
+      if (!worker) {
         const source = worker = new Worker('js/stuck-worker.js');
         source.onmessage = e => { if (source === worker) pending(e.data); };
-        source.onerror = () => {
-          if (source !== worker) return;
-          const requests = [...pendingMap.values()];
-          source.onmessage = source.onerror = null; source.terminate(); worker = null; pendingMap.clear();
-          for (const entry of requests) later(() => { if (eligible()) entry.verdict(E().isStuck(entry.token.game)); }, 0, entry.token);
-        };
+        source.onerror = source.onmessageerror = () => failSearch(source, 'unavailable');
       }
-      if (worker) { pendingMap.set(id, { token, verdict }); worker.postMessage(JSON.parse(JSON.stringify(snap))); }
-      else later(() => { if (eligible()) verdict(E().isStuck(g)); }, 0, token);
+      const source = worker, timeout = later(() => failSearch(source, 'timeout'), 4000, token);
+      pendingMap.set(id, { token, type, verdict, timeout });
+      // Structured clone only the bounded position, never profile/history data.
+      worker.postMessage(snap);
     } catch (error) {
-      if (worker) { worker.onmessage = worker.onerror = null; worker.terminate(); worker = null; } pendingMap.clear();
-      later(() => { if (eligible()) verdict(E().isStuck(g)); }, 0, token);
+      failSearch(worker, 'unavailable');
     }
   }
   const pendingMap = new Map();
   function pending(data) {
-    const entry = pendingMap.get(data.id); if (!entry) return;
-    if (data.session !== entry.token.session || data.revision !== entry.token.revision) return;
-    pendingMap.delete(data.id); entry.verdict(data.stuck);
+    const entry = pendingMap.get(data?.id); if (!entry) return;
+    if (data.session !== entry.token.session || data.revision !== entry.token.revision || data.workEpoch !== entry.token.workEpoch || data.type !== entry.type) return;
+    if (!isCurrent(entry.token) || !eligible()) return;
+    if (data.status === 'unavailable') { failSearch(worker, 'unavailable'); return; }
+    if (entry.type === 'endgame' ? !['solved', 'no-plan-within-budget'].includes(data.status) : data.status !== 'checked') { failSearch(worker, 'unavailable'); return; }
+    cancelLater(entry.timeout); pendingMap.delete(data.id);
+    B.searchStatus = { state: data.status, type: entry.type, id: data.id, session, revision, elapsedMs: data.elapsedMs };
+    entry.verdict(data);
   }
   async function runAutoComplete() {
     if (!action() || !B.plan || B.planFor !== revision) return;
@@ -865,6 +902,7 @@
     set onStuck(fn) { B.onStuck = fn; },
     pause, setAppActive, hold, setScreen, dispose, capture, captureView, isCurrent, isSession, canPresent, onInvalidate, later, cancelLater, wait, frame, syncClock, cancelAutoComplete, stopTimer, startTimer,
     get game() { return B.g; }, set onWin(fn) { B.onWin = fn; },
+    get searchStatus() { return B.searchStatus && Object.assign({}, B.searchStatus); },
     highlight(from, idx, to) { if (!B.g || !B.active) return; clearHints(); const g = B.g; for (let i = idx; i < g.cols[from].length; i++) { const d = B.els.get(g.cols[from][i].id); d && d.classList.add('hint-src'); } if (to != null) B.hls[to].classList.add('hint-dst'); },
     clearHints, stockHighlight(v) { $('#btnStock').classList.toggle('hint-dst', v); }
   };

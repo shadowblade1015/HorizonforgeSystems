@@ -1,5 +1,25 @@
 # Phase 4 performance report
 
+## Phase 4.3 measured remediation — October 26, 2026
+
+Current candidate is described in [P4_03_REMEDIATION_REPORT.md](P4_03_REMEDIATION_REPORT.md). The original Phase 4 report below is preserved. Final generated release: `e759216677bd42a3d9659c143c0a5b8be0e583844c3650fdb7970f40d8e59809`; Windows Chrome 155.0.8059.86. Baseline `.phase2-backup/phase4-3/baseline/independent/summary.json`; after `.phase2-backup/phase4-3/validated/independent/summary.json` and separate `validated/solver/summary.json`.
+
+| Actual scheduled Board seed-42 path | Normal before | Normal after | 4× page CPU before | 4× page CPU after |
+| --- | --- | --- | --- | --- |
+| Synchronous main-thread planner | 286.9 ms | **0 calls** | 2,316.6 ms | **0 calls** |
+| Maximum RAF interval | 283.2 ms | **33.4 ms** | 2,499.8 ms | **50.0 ms** |
+| RAF p95 after | — | 16.8 ms | — | 16.8 ms |
+| Endgame worker compute | — | 265.3 ms | — | 279.9 ms |
+| Request-to-reply, including startup/scheduling | — | 280.7 ms | — | 3,066.2 ms |
+
+Both requests used the matching immutable worker/engine release and returned `no-plan-within-budget`. No main-thread long task was observed between request and reply. The 4× window retained a **187 ms pre-request render/setup long task**, which was not removed by worker offloading. CPU throttling targets the page; worker compute figures do not establish uniform worker/GPU throttling or physical mobile speed. Search compute, optional-plan availability and main-thread blocking are different measurements. No real-user INP claim is made.
+
+The new dedicated suite additionally measures a constructed two-move terminal fixture and a seed-42 two-suit hand advanced through 40 legal actions, retaining normal hidden cards. Near-win worker compute was **1.0 / 1.0 ms**, maximum RAF **17.0 / 16.8 ms** at normal/4×; the reachable-hand stuck check was **1.2 / 1.3 ms**, maximum RAF **16.8 / 16.9 ms**. Its hard seed-42 worker took **274.6 / 292.7 ms**. The dedicated normal hard sample nevertheless recorded **499.9 ms maximum RAF with no corresponding JS long task**; its 4× maximum RAF was 16.9 ms, with a separate 163 ms render/setup task. This discrepancy remains unexplained and retained, rather than excluded to claim universally smooth rendering. The reachable 4× setup also produced a 121 ms long task. Artwork/layout were warmed before these dedicated measurements; earlier cold/concurrent diagnostics are retained separately.
+
+Board now owns one asynchronous request/worker at a time, with exact session/revision/request/epoch checks and a four-second deadline. Existing endgame 20,000-node and stuck-search budgets remain; missing/crashed/hung workers never invoke a main-thread search or prove a hand impossible. The old recursive endgame planner overflowed the actual worker stack in a retained diagnostic. Explicit DFS frames remove that stack dependency, preserve 19 captured original outcomes and avoid repeated path copies; card rules and F15 heuristic remain unchanged.
+
+**Current result: P4-02/F13 repaired for the tested candidate.** All 352 Node, 24 solver, 13 mobile, 46 offline, 19 multi-tab and 34 independent browser checks pass. Remaining risks include rendering/decode/layout work, the RAF discrepancy, worker memory/CPU/battery cost, finite-budget missed solutions, startup latency, OS suspension and physical-device behavior. Worker deadlines are event-loop-serviced, not hard real-time guarantees. Field metrics, deployment/CDN and physical Safari/Android remain unmeasured. No overall release GO follows from this performance repair.
+
 Independent local lab, 2026-10-26T03:21:17.269Z; Chrome/155.0.8059.86; Node v24.22.0. Target SHA 65d902e5d542de38f7fedc4a51b3c1314201a23c, release 61d8345f99c93b5a67f55238de98c1438bd00a64a4986d495b1cc8b0205262ec. These observations do not certify production Core Web Vitals or physical device behavior. Raw data and timings: .phase2-backup/phase4/independent/summary.json; Node stress trials: .phase2-backup/phase4/solver-node.json.
 
 ## Method and limitations

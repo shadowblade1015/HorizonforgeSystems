@@ -1,5 +1,9 @@
 # Phase 4 issue register
 
+## October 26 follow-up: Phase 4.3
+
+**P4-02/F13: repaired in `fix/ember-p4-03-solver`, based on integrated release candidate `977e5d3`.** [P4_03_REMEDIATION_REPORT.md](P4_03_REMEDIATION_REPORT.md) records the worker protocol, cancellation/deadline boundaries, stack-safe DFS compatibility and exact measurements. Scheduled-search maximum frame gaps changed from **283.2 to 33.4 ms normally** and **2,499.8 to 50.0 ms at 4× page CPU emulation**, with zero main-thread searches. **352 Node / 24 solver / 13 mobile / 46 offline / 19 multi-tab checks pass; independent browser 34 PASS / 0 FAIL.** Separate rendering/RAF anomalies and physical-device/production gates remain documented; F15 is unchanged. The historical F13 reproduction below remains evidence of the original defect, not the current candidate. No promotion or deployment is authorized; overall launch remains NO-GO for the separate uncompleted gates.
+
 ## October 26 follow-up: Phase 4.2
 
 **P4-03, P4-04 and P4-05: repaired in the Phase 4.1-based candidate.** [P4_02_REMEDIATION_REPORT.md](P4_02_REMEDIATION_REPORT.md) records the independently reproduced original failures, exact fixes, evidence-handling deviation and remaining gates. Final checks: **329 Node, 13 mobile, 42 offline, 19 multi-tab; independent browser 32 PASS / 0 FAIL**. Offline claims now require separate same-release core/artwork readiness; live motion changes cancel/restart only eligible effects; Later restores focus through shared screen/modal ownership. Earlier FAIL statements below are historical observations, not current candidate status. **P4-02/F13 solver work is deferred to Phase 4.3.** Overall launch remains NO-GO; no deployment or physical-device/AT certification was performed.

@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { root, readTree } from '../tools/verify-source.mjs';
+import { generate } from '../tools/release.mjs';
 
 test('clean build from another cwd, stale removal, rollback copy and failed validation', () => {
   const dir = mkdtempSync(resolve(tmpdir(), 'hfs-build-'));
@@ -13,7 +14,7 @@ test('clean build from another cwd, stale removal, rollback copy and failed vali
     const build = () => spawnSync(process.execPath, [resolve(dir, 'build.mjs')], { cwd: tmpdir(), encoding: 'utf8' });
     assert.equal(existsSync(resolve(dir, 'dist')), false);
     let r = build(); assert.equal(r.status, 0, r.stderr);
-    assert.deepEqual(readTree(resolve(dir, 'dist')), readTree(resolve(dir, 'site')));
+    assert.deepEqual(readTree(resolve(dir, 'dist')), generate(readTree(resolve(dir, 'site'))).output);
     writeFileSync(resolve(dir, 'dist/stale.txt'), 'retain in rollback');
     r = build(); assert.equal(r.status, 0, r.stderr);
     assert.equal(existsSync(resolve(dir, 'dist/stale.txt')), false);

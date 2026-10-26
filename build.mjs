@@ -1,13 +1,14 @@
 ﻿// Dependency-free, script-relative build. Never publish unvalidated output.
 import { mkdirSync, writeFileSync, renameSync, existsSync, mkdtempSync, openSync, closeSync, unlinkSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
+import { generate } from './tools/release.mjs';
 import { root, readTree, verify } from './tools/verify-source.mjs';
 
 const lock = resolve(root, '.build.lock');
 const fd = openSync(lock, 'wx'); // Reject concurrent builds and interrupted-build ambiguity.
 let stage;
 try {
-  const source = readTree(resolve(root, 'site'));
+  const { output: source } = generate(readTree(resolve(root, 'site')));
   stage = mkdtempSync(resolve(root, '.dist-stage-'));
   for (const [p, bytes] of source) {
     const target = resolve(stage, p);

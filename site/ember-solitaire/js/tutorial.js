@@ -87,6 +87,7 @@
     }
   }
   function start() {
+    if (!St().canEdit) { UI.saveRecovery(); return; }
     cancelCoach();
     const g = tutorialDeal(); g.run = 0; g.tutorial = true;
     g.initial = JSON.parse(JSON.stringify({ cols: g.cols, stock: g.stock }));

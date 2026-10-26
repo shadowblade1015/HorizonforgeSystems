@@ -1,0 +1,49 @@
+# Phase 4 monetization and privacy review
+
+Assessment date: October 25, 2026. Scope: current tracked source, configuration, support flows and current official publisher documentation. This is a technical assessment, not legal advice or a certification of legal compliance. No live ad units, publisher account, email inbox, hosting-log configuration or consent-console settings were accessed. No advertisements were activated or clicked.
+
+## Decision
+
+**Web with live ads: NO-GO.** The current product is an ad-free web game, not an implemented web advertising product. Account/site approval is **NOT TESTED**, not failed or assumed approved. A separate approved integration and publisher/privacy sign-off are required. These missing monetization gates do not by themselves block an ad-free web release.
+
+| Gate | Result | Evidence and limits |
+| --- | --- | --- |
+| Browser ads disabled | PASS | `site/ember-solitaire/js/build-config.js:2-9` sets native/firebase/adsProduction false; `ads.js:33-36` exits outside native platform. `config.js:24-28` contains public sample AdMob IDs and blank production units. |
+| Browser remote analytics/crash transmission disabled | PASS | `analytics.js:23-25,38-53,69-71` gates transmission behind native and Firebase flags. Temporary events remain in memory. No external analytics script/ad tag was found in tracked HTML/JS. Deployment-level injection remains a separate gate. |
+| Source notice agrees with current game | PASS | `privacy.html:17-36` describes local progress, no ad/Firebase transmission, temporary diagnostics, hosting connection logs, email support and future changes. It explicitly excludes future Android/live ads. This does not verify actual host retention or legal entity/account control. |
+| Web advertising implementation / real placements | FAIL | No browser ad implementation, inventory or placement geometry exists. Native `ads.js` and `?ads=mock` are not AdSense inventory. This is a capability gap, not a claim of an existing policy violation. |
+| AdSense account, ownership and site approval | NOT TESTED | No account evidence supplied; repository cannot prove approval or eligibility. |
+| Web CMP, regional behavior and withdrawal | NOT TESTED | No browser CMP is configured. Native UMP code is not a web consent system. Required before the relevant advertising data practices are enabled. |
+| Current live-ad spacing/performance/invalid-traffic telemetry | NOT APPLICABLE | No live ads in current browser configuration; must become explicit release tests for an ad-supported build. |
+| Support email delivery, retention, deletion handling | NOT TESTED | Mailto UI exists; mailbox ownership, deletion procedures, processor terms and actual response handling were not exercised. |
+
+## Actual data-flow inventory
+
+* **Progress/recovery:** `store.js:215-276,293-344` reads/writes localStorage, including main save, backup and retained recovery copies. `ui.js:228-277` exports downloadable JSON and validates imported files before confirmed replacement. Export is a local user action; there is no automatic support upload. Exports contain progress/preferences and may be sensitive to the player even without account identifiers.
+* **Offline files:** `sw.js` stores immutable release assets and client-release metadata in CacheStorage. Cached files are not cloud saves. Cache removal and browser site-data removal can affect offline availability. Privacy text discloses caching (`privacy.html:25-28`).
+* **Diagnostics:** `analytics.js:38-49,89-96` records timestamped gameplay/error events in the page; debug query mode writes to the developer console. No current web transmission is enabled. Native Firebase/Crashlytics paths are a materially different configuration, reviewed below and in ANDROID_READINESS.md.
+* **Delivery:** same-origin document, scripts, artwork, fonts, manifest, release JSON and worker requests reach the host; ordinary connection logs may contain IP/request information. `privacy.html:31-32` acknowledges this. Vercel dashboard analytics, injected services, log destinations/retention and production responses were not verified by this workstream.
+* **Support/website inquiry:** `site/pages.js:5-16` constructs a mailto draft from name/email/organization/budget/timeline/message and optionally writes it to the clipboard after a user action; it does not submit to a server. `site/contact/index.html:3` clearly says the user reviews and sends from their email app and warns against sensitive records. Mail service then receives what the player sends. External portfolio links are user navigation, not embedded analytics requests.
+* **Current advertising cookies/identifiers:** none introduced by the tracked web ad/analytics paths. This observation is not proof that a production CDN, browser extension or future integration introduces none.
+
+## Findings
+
+### COM-01 — Live web monetization gates are absent
+
+**FAIL / P1 for the live-ads channel only. Probability:** certain if this exact build is offered as ad-supported; approval outcome unknown. **Source evidence:** `build-config.js:5-7`, `ads.js:26-36`, `config.js:20-28`, `privacy.html:17,22,35-36`. Reproduce by loading the ordinary browser build: the native gate exits; no browser publisher library/unit or web CMP is configured. Impact: no monetization capability, unverified policy/consent/account readiness. **Smallest remediation:** retain the ad-free build; separately implement a reviewed browser publisher integration after account/site approval, inventory review and updated data disclosures. **Owner:** publisher owner plus privacy reviewer and web engineer. **Effort:** 3-8 engineer days after publisher decisions, excluding external approvals and regional legal review. Gate: live-ads release.
+
+### COM-02 — Native Firebase consent is not fail-closed
+
+**FAIL / P1 for Firebase-enabled native distribution; current web unaffected. Probability:** deterministic under the stated native flags. `analytics.js:23-25,38-42` starts with analytics consent true; `app.js:28-31` initiates Crashlytics custom keys and Remote Config before ad-consent completion. The isolated source probe in `.phase2-backup/phase4/native-boundary-probe.json` executes `Analytics.log('game_start')` with native/firebase true before `applyConsent` and observes a FirebaseAnalytics.logEvent call. `analytics.js:58-65` also derives analytics consent from ad-request eligibility, which is not evidence of a separately valid analytics choice. This proves application call ordering, not a packet capture or the final native SDK's automatic-collection settings. **Smallest remediation proposal:** a separate native remediation branch must default relevant collection off, verify SDK initialization defaults, distinguish analytics and advertising choices, gate Remote Config/crash behavior appropriately and test consent/withdrawal/error paths before enabling Firebase. **Owner:** native engineer and privacy reviewer. **Effort:** 2-5 days plus real SDK/device verification. Gate: native with remote SDKs; legal/publisher review required.
+
+### COM-03 — Operational privacy evidence remains unavailable
+
+**NOT TESTED / P2 evidence gap, not a reproduced violation. Probability:** unknown. Notice locations: `privacy.html:31-36`; contact implementation: `site/pages.js:5-16`. Host log retention, mailbox access/deletion workflow, processor contracts, jurisdiction/audience and production injection were not supplied. **Remediation:** publisher/privacy owner records actual processors, retention/access controls, verified support contact and the deployed data-flow/notice match; amend notice only where facts require it. **Effort:** 0.5-2 reviewer days plus provider responses. Gate: commercial/legal sign-off; do not silently treat source review as approval.
+
+## Conservative advertising plan
+
+Launch and validate the ad-free experience first. If web monetization is approved, start with one clearly labelled, reserved-size placement on a non-gameplay informational or home/results page, away from Play/Resume, cards, drag paths, Deal/Undo/Hint, consent controls and recovery UI. On compact viewports omit inventory rather than compressing gameplay controls. Avoid overlays, auto-refresh, in-play sticky ads and surprise navigation interstitials in the initial web integration. Test zoom, short landscape, keyboard focus, layout shift, slow/blocked ads and offline behavior before enabling inventory. Do not transplant native AdMob rewarded logic into ordinary AdSense placements: product/inventory support and policies differ.
+
+Publisher owner must verify account/site status and content eligibility, choose approved inventory and a compatible certified web CMP where required, update disclosures and withdrawal entry points, and review regional legal obligations. Nonpersonalized ads are not a blanket exemption from privacy obligations. Use official test modes only; exclude live ads from automation, never click one's own ads, monitor suspicious traffic and preserve an immediate serving kill switch. Freeze placement changes during the initial rollout. Re-measure load/interaction/CLS after integration; no source-only performance estimate certifies ad impact.
+
+Official sources checked October 25, 2026: [Google publisher consent requirements](https://support.google.com/adsense/answer/13554116) require certified TCF CMP support for personalized inventory in EEA/UK/Switzerland and explicitly do not certify legal compliance; [Ad placement policies](https://support.google.com/adsense/answer/1346295) address accidental clicks near game/navigation controls; [AdSense program policies](https://support.google.com/adsense/answer/48182) prohibit artificial traffic and own-ad clicks; [Android UMP integration](https://developers.google.com/admob/android/privacy) documents launch-time consent refresh and privacy-option handling. Recheck policies at implementation and release time.

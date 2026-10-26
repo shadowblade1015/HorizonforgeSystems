@@ -81,6 +81,7 @@
     for (const fn of [...invalidators]) { try { fn(kind); } catch (error) { console.error(error); } }
   }
   function eligible() {
+    if (!ES.Store.canEdit) return false;
     return !!B.g && B.g === ES.Store.state.game && B.active && !B.paused && !holds.size && !document.hidden && B.pageActive !== false && B.appActive !== false && ES.UI.current === 'game' && !B.g.won;
   }
   function syncClock() {
@@ -132,6 +133,7 @@
     B.g = null; B.victoryOut = null; B.victoryShown = false;
   }
   function action(allowWon = false, automated = null) {
+    if (!ES.Store.canEdit) return false;
     if (!B.g || B.drag || B.g !== ES.Store.state.game || !B.active || B.paused || holds.size || document.hidden || B.pageActive === false || B.appActive === false || ES.UI.current !== 'game' || (!allowWon && B.g.won)) return false;
     if (automated) return automated === B.autoRun && !automated.cancelled && isCurrent(automated.token);
     if (B.autoRunning) { cancelAutoComplete(); invalidate('pause'); render({ type: 'none' }); if (eligible()) scheduleEndgameChecks(); }
@@ -790,7 +792,11 @@
   /* ---------- public ------------------------------------------------------- */
   function mount() {
     if (B.el) return;
-    ES.Store.on(event => { if (event.type === 'beforeGameChange') dispose(); else if (event.type === 'beforeSnapshot') syncClock(); });
+    ES.Store.on(event => {
+      if (event.type === 'beforeGameChange') dispose();
+      else if (event.type === 'beforeSnapshot') syncClock();
+      else if ((event.type === 'persistence' || event.type === 'ownership') && !ES.Store.canEdit) { syncClock(); invalidate('pause'); }
+    });
     document.addEventListener('visibilitychange', () => { syncClock(); if (document.hidden) invalidate('pause'); else resumeWork(); });
     root.addEventListener('pagehide', () => { syncClock(); B.pageActive = false; invalidate('pause'); syncClock(); });
     root.addEventListener('pageshow', () => { B.pageActive = true; resumeWork(); });

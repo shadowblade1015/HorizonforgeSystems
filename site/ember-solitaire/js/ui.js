@@ -238,10 +238,12 @@
       <div class="menu-list">
         <button class="btn btn-block" id="saveExport">Export current progress</button>
         <button class="btn btn-block" id="saveOriginal">Export original save</button>
+        <button class="btn btn-block" id="saveStored">Export latest stored save</button>
         <button class="btn btn-block" id="saveBackup">Export last good backup</button>
         <label for="recoveryCopy">Retained recovery copies</label><select id="recoveryCopy" aria-label="Retained recovery copy"></select>
         <button class="btn btn-block" id="saveCopy">Export selected recovery copy</button>
         <button class="btn btn-block" id="saveRetry">Retry saving</button>
+        <button class="btn btn-block" id="saveResume">Resume editing / reload latest</button>
         <button class="btn btn-block" id="saveAccept">Use recovered progress</button>
         <label for="saveImport">Choose a save to import</label><input id="saveImport" type="file" accept="application/json,.json">
       </div>`, onMount(wrap, close) {
@@ -251,6 +253,7 @@
       show();
       wrap.querySelector('#saveExport').onclick = () => { try { downloadSave(store.exportSave(), 'ember-save-v2.json'); } catch (e) { message.textContent = e.message; } };
       wrap.querySelector('#saveOriginal').onclick = () => downloadSave(store.exportOriginal(), 'ember-original-save.json');
+      wrap.querySelector('#saveStored').onclick = () => { try { downloadSave(store.exportStored(), 'ember-stored-save.json'); } catch (_) { message.textContent = 'Stored progress cannot be read. Export this tab before leaving.'; } };
       wrap.querySelector('#saveBackup').onclick = () => { try { downloadSave(store.exportBackup(), 'ember-backup.json'); } catch (e) { message.textContent = 'Backup storage is unavailable.'; } };
       const choices = wrap.querySelector('#recoveryCopy');
       try {
@@ -258,6 +261,14 @@
       } catch (e) { message.textContent += ' Recovery storage is unavailable.'; }
       wrap.querySelector('#saveCopy').onclick = () => { try { downloadSave(store.exportRecovery(choices.value), 'ember-recovery.json'); } catch (e) { message.textContent = 'Recovery copy is unavailable.'; } };
       wrap.querySelector('#saveRetry').onclick = () => { store.save(true); show(); };
+      wrap.querySelector('#saveResume').onclick = () => {
+        sheet({ title: 'Reload latest progress?', body: '<p>Export this tab first if you need its unsaved progress. This reloads the latest stored profile after acquiring exclusive save ownership. It does not merge rewards. Close the other saving tab first.</p>', actions: [{ label: 'Keep reviewing' }, { label: 'Reload latest and resume', primary: true, onClick: async () => {
+          const ok = await store.resumeEditing();
+          if (ok) { close(); applySettings(); go('home'); toast('Latest progress loaded. This tab owns saving.'); }
+          // Store.load intentionally disposes the old board and its sheets.
+          else if (!wrap.lifecycleClosed && wrap.isConnected !== false) { show(); message.textContent = store.persistence.message; }
+        } }] });
+      };
       wrap.querySelector('#saveAccept').onclick = () => {
         sheet({ title: 'Use recovered progress?', body: '<p>The damaged hand or invalid fields will be excluded. Review an exported copy first. The original save will stay in recovery storage.</p>', actions: [{ label: 'Keep reviewing' }, { label: 'Save recovered progress', primary: true, onClick: () => { store.acceptRecovery(); show(); } }] });
       };

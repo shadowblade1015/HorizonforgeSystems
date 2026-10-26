@@ -16,6 +16,17 @@
   const modals = [], isolated = new Map();
   const topModal = () => modals[modals.length - 1];
   const within = (el, node) => { for (let n = node; n; n = n.parentElement || n.parentNode || n.parent) if (n === el) return true; return false; };
+  // Nonmodal notices return through the same screen/modal ownership boundary.
+  function captureScreenFocus(element) { return { element, page: UI.current, navigation }; }
+  function restoreScreenFocus(owner) {
+    const top = topModal();
+    if (top) { if (!within(top.el, document.activeElement)) top.focus(); return; }
+    const screen = $('#scr-' + UI.current);
+    const valid = el => el && el.isConnected !== false && !el.disabled && !el.inert && !el.hidden && !el.closest?.('[hidden], [inert], [aria-hidden="true"]') && (!el.getClientRects || el.getClientRects().length > 0) && within(screen, el);
+    const preferred = owner?.navigation === navigation && owner.page === UI.current ? owner.element : null;
+    const target = valid(preferred) ? preferred : [...screen?.querySelectorAll('button, [href], input, select, textarea, [tabindex]') || []].find(valid);
+    target?.focus({ preventScroll: true });
+  }
   function isolate() {
     const top = topModal(), app = document.getElementById('app');
     for (const el of app.children) {
@@ -311,6 +322,6 @@
     if (b) { ES.Audio.play('ui'); back(); }
   });
 
-  Object.assign(UI, { modal, hasModal: () => !!topModal(), isActiveModal: el => topModal()?.el === el, saveRecovery, mountSaveStatus, $, $$, esc, n, dur, clock, date, go, back, render, toast, sheet, header, molten, levelBadge, artifactStage, wireHeat, animateHeat, hydrateIcons, applySettings, setEnv, I });
+  Object.assign(UI, { modal, captureScreenFocus, restoreScreenFocus, hasModal: () => !!topModal(), isActiveModal: el => topModal()?.el === el, saveRecovery, mountSaveStatus, $, $$, esc, n, dur, clock, date, go, back, render, toast, sheet, header, molten, levelBadge, artifactStage, wireHeat, animateHeat, hydrateIcons, applySettings, setEnv, I });
   ES.UI = UI;
 })(typeof window !== 'undefined' ? window : globalThis);

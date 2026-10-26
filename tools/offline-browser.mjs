@@ -5,7 +5,7 @@ import {extname,resolve} from 'node:path';
 import {generate} from './release.mjs';
 import {readTree,root,hash,archiveFiles} from './verify-source.mjs';
 import {chromeAudit,until} from './chrome-audit.mjs';
-const out=resolve(root,'.phase2-backup/phase3f-browser');mkdirSync(out,{recursive:true});
+const out=resolve(root,process.env.HFS_OFFLINE_EVIDENCE||'.phase2-backup/phase3f-browser');mkdirSync(out,{recursive:true});
 const source=readTree(resolve(root,'site'));
 function variant(label) {
  const input=new Map(source);
@@ -95,7 +95,7 @@ try {
  if(!attached)throw Error('No running B worker target');
  await chrome.send('Runtime.evaluate',{expression:'self.auditPut=Cache.prototype.put;Cache.prototype.put=function(){return Promise.reject(new DOMException("Injected write failure","QuotaExceededError"))};'},attached.sessionId);
  await a.evaluate('ES.Offline.downloadAll()');check('fault-injected worker cache-write failure is visible',await a.evaluate('document.querySelector(".offline-status").textContent.includes("could not")'));
- await chrome.send('Runtime.evaluate',{expression:'Cache.prototype.put=self.auditPut;'},attached.sessionId);await a.evaluate('ES.Offline.downloadAll()');check('optional download recovers after write failures',await a.evaluate('document.querySelector(".offline-status").textContent.includes("All artwork downloaded")'));
+ await chrome.send('Runtime.evaluate',{expression:'Cache.prototype.put=self.auditPut;'},attached.sessionId);await a.evaluate('ES.Offline.downloadAll()');check('optional download recovers after write failures',await a.evaluate('document.querySelector(".offline-status").textContent.includes("all supported modes and artwork are available offline")'));
  const ownCache='ember-solitaire:'+encodeURIComponent(base)+':release-v1:'+B.release.id;
  await a.evaluate(`caches.open(${JSON.stringify(ownCache)}).then(c=>c.delete(${JSON.stringify(origin+B.release.base+'js/engine.js')}))`);network=false;
  const evicted=await a.evaluate(`fetch(${JSON.stringify(origin+B.release.base+'js/engine.js')}).then(async r=>{await r.arrayBuffer();return r.status})`);

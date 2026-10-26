@@ -1,5 +1,7 @@
 # Phase 4 go/no-go decision
 
+October 26 Phase 4.2 follow-up: [P4-03/P4-04/P4-05 are repaired](P4_02_REMEDIATION_REPORT.md), with 329 Node tests, 13 mobile, 42 offline, 19 multi-tab and 32 independent browser checks passing (zero independent FAIL observations). This removes the three targeted offline/motion/focus source defects from the current candidate, while preserving the previous audit below. **Overall NO-GO remains:** P4-02 solver disposition is deferred to Phase 4.3; legacy-tab rollout and actual deployment/device/AT/privacy evidence remain open, with additional advertising/native gates for those channels. The report records an evidence-preservation deviation affecting four Phase 4.1 artifacts. No channel was promoted or deployed.
+
 October 26 follow-up: [P4-01 is repaired for supported cooperating tabs](P4_01_REMEDIATION_REPORT.md), with 304 passing Node tests and 19 real multi-tab browser checks. The original October 25 assessment below remains historical. No channel is promoted to GO by this focused change: legacy-tab rollout, the remaining offline/motion/focus/performance findings and uncollected deployment/device/commercial evidence still need disposition. No deployment was performed.
 
 Assessment: October 25, 2026 (evidence UTC crosses October 26), commit `65d902e5d542de38f7fedc4a51b3c1314201a23c`. This is an independent audit of the merged application. No production code was fixed. Existing implementation reports and passing tests are evidence inputs, not authorization to launch.

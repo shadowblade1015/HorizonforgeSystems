@@ -4,6 +4,7 @@
   const ES = root.ES = root.ES || {};
   let registration, id, scope, banner, message, update, download, deferred = false, approving = false;
   let releaseHold = () => {}, reloadTarget = null, reloadTimer, reloading = false;
+  let returnFocus;
   const supports = worker => { try { return new URL(worker.scriptURL).searchParams.get('emberProtocol') === '1'; } catch (_) { return false; } };
   const text = value => { if (message) message.textContent = value; };
   function rpc(worker, data, timeout = 12000) {
@@ -21,6 +22,16 @@
     }
   }
   function show(value) { text(value); if (banner && !deferred) banner.hidden = false; }
+  async function currentStatus(worker) {
+    const status = await rpc(worker, { type: 'STATUS' });
+    if (status.id !== id) throw Error('Update this tab first');
+    return status;
+  }
+  function capability(status, artworkDownloaded = false) {
+    if (!status.ok) return (artworkDownloaded ? 'Artwork downloaded. ' : '') + 'Core offline files are incomplete. Use Repair offline files before reliable offline play.';
+    if (status.artworkOk === true) return 'Offline ready for this release: all supported modes and artwork are available offline.';
+    return 'Offline ready: one suit, default back/table, fonts and forge screens. Other artwork needs a connection or Download all artwork.';
+  }
   async function check() {
     if (!registration) return;
     await hello();
@@ -32,8 +43,7 @@
       reloadTarget = status.id !== id || registration.waiting ? status.id : null;
       update.hidden = !reloadTarget; update.disabled = !status.ok || status.legacyClients > 0;
       if (reloadTarget) { deferred = false; show(status.legacyClients > 0 ? 'Close other older game tabs before updating, then check again in Settings. Their progress is not coordinated. Save Recovery remains available.' : 'An update is ready. Update & reload saves your progress first. Other tabs keep their current release; saves between tabs may conflict.'); }
-      else if (status.ok) show('Offline ready: one suit, default back/table, fonts and forge screens. Other artwork needs a connection or Download all artwork.');
-      else show('Offline files are incomplete or were evicted. Stay online and retry installation; keep recovery exports.');
+      else show(capability(status));
     } catch (_) { show('Offline installation is not ready. Keep this page open and retry online.'); }
   }
   function unblock(value) {
@@ -78,27 +88,35 @@
       return true;
     } catch (_) { unblock('Update unavailable. Your saved and in-memory progress remain intact. Retry online.'); return false; }
   }
-  function defer() { if (approving) return; deferred = true; banner.hidden = true; }
+  function defer() {
+    if (approving) return;
+    const focused = banner?.contains?.(document.activeElement);
+    deferred = true; banner.hidden = true;
+    if (focused) ES.UI.restoreScreenFocus(returnFocus);
+    returnFocus = null;
+  }
   async function downloadAll() {
     if (!registration || download.disabled) return;
     download.disabled = true; show('Downloading optional artwork. Keep this page open.');
     try {
       // Ask the page's release worker only; another release must never fill it.
-      const worker = navigator.serviceWorker.controller, status = await rpc(worker, { type: 'STATUS' });
-      if (status.id !== id) throw Error('Update this tab first');
+      const worker = navigator.serviceWorker.controller;
+      await currentStatus(worker);
       const result = await rpc(worker, { type: 'DOWNLOAD' }, 180000);
-      show(result.ok ? 'All artwork downloaded for this release. All suit modes, backs and tables are available offline.' : 'Some optional artwork could not be stored. Core offline play is unchanged. Reconnect and retry; storage may be full.');
-    } catch (_) { show('Optional download did not complete. Reconnect and retry, or update this tab first. Core files were not cleared.'); }
+      const status = await currentStatus(worker);
+      show(result.ok ? capability(status, true) : 'Some optional artwork could not be stored. ' + capability(status));
+    } catch (_) { show('Offline availability could not be verified. Artwork may have downloaded; reconnect and retry or update this tab first. Use Repair offline files if needed. Existing files were retained.'); }
     finally { download.disabled = false; }
   }
   async function repair() {
     try {
-      const worker = navigator.serviceWorker.controller, status = await rpc(worker, { type: 'STATUS' });
-      if (status.id !== id) { show('Update this tab before repairing offline files.'); return; }
+      const worker = navigator.serviceWorker.controller;
+      await currentStatus(worker);
       show('Repairing offline files. Keep this page open.');
       const result = await rpc(worker, { type: 'REPAIR' }, 180000);
       if (!result.ok) throw Error('Repair failed');
-      await check();
+      const status = await currentStatus(worker);
+      show(capability(status));
     } catch (_) { show('Offline repair could not complete. Existing cached files and player progress were retained. Reconnect and retry.'); }
   }
   async function start() {
@@ -121,6 +139,6 @@
       await check();
     } catch (_) { show('Offline installation failed or storage is unavailable. Online play can continue; retain recovery exports.'); }
   }
-  async function reopen() { deferred = false; if (banner) banner.hidden = false; try { await registration?.update(); } catch (_) { show('Update check unavailable offline. Existing cached play is unchanged.'); } await check(); }
+  async function reopen() { returnFocus = ES.UI.captureScreenFocus(document.activeElement); deferred = false; if (banner) banner.hidden = false; try { await registration?.update(); } catch (_) { show('Update check unavailable offline. Existing cached play is unchanged.'); } await check(); }
   ES.Offline = { start, check: reopen, approve, defer, downloadAll, repair, get id() { return id; }, get target() { return reloadTarget; } };
 })(typeof window !== 'undefined' ? window : globalThis);

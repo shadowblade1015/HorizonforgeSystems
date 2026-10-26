@@ -7,7 +7,7 @@ import {resolve, extname, sep} from 'node:path';
 import {tmpdir} from 'node:os';
 import {fileURLToPath} from 'node:url';
 const root=resolve(fileURLToPath(new URL('../site',import.meta.url)));
-const out=resolve('.phase2-backup/phase3e-browser',process.argv[2]||'after');
+const out=resolve(process.env.HFS_MOBILE_EVIDENCE||'.phase2-backup/phase3e-browser',process.argv[2]||'after');
 await mkdir(out,{recursive:true});
 const server=createServer(async(req,res)=>{try{let p=resolve(root,'.'+decodeURIComponent(new URL(req.url,'http://localhost').pathname));if(!p.startsWith(root+sep))throw Error();if(!extname(p))p=resolve(p,'index.html');res.setHeader('Content-Type',({'.js':'text/javascript','.css':'text/css','.html':'text/html','.webp':'image/webp','.woff2':'font/woff2'})[extname(p)]||'application/octet-stream');res.end(process.argv[2] === 'before' ? execFileSync('git', ['show', 'HEAD:site/' + p.slice(root.length + 1).replaceAll(sep, '/')], {maxBuffer: 10000000, windowsHide: true}) : await readFile(p));}catch{res.writeHead(404);res.end();}});
 await new Promise(r=>server.listen(0,'127.0.0.1',r));

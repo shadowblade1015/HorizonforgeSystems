@@ -194,3 +194,29 @@ git status --short
 ```
 
 It now records **19 PASS / 3 known FAIL observations**: stale-tab preservation passes; existing offline-readiness/motion/Later-focus defects remain outside this remediation. The runner's exit code is not a waiver for those FAIL gates. New evidence is ignored under `.phase2-backup/phase4-1/`, indexed separately. Report and support/rollback boundaries: [phase4/P4_01_REMEDIATION_REPORT.md](phase4/P4_01_REMEDIATION_REPORT.md). Functional secure-context Web Locks are mandatory for editing; unsupported browsers fail closed. Drain pre-4.1 tabs before rollout, and never roll back to uncoordinated Store code or an incompatible historical worker. No cross-device sync, native durability or public launch certification is claimed.
+
+## Phase 4.2 offline and accessibility remediation
+
+Current candidate: **329 Node tests pass; 13 mobile, 42 offline, 19 multi-tab and 32 independent browser checks pass, zero independent FAIL observations**. The original P4-03/P4-04/P4-05 defects were reproduced before editing. New tests cover core versus optional readiness, current-release checks/timeouts/repair, actual draw cancellation and restart, repeated/hidden/lifecycle motion changes, and visible focus restoration under navigation/modal ownership. The shared status live region remains; human AT speech and physical devices are not certified.
+
+Use separate evidence destinations (choose a new suffix for later runs to retain these outputs):
+
+```powershell
+$env:HFS_MOBILE_EVIDENCE='.phase2-backup/phase4-2/mobile'
+$env:HFS_OFFLINE_EVIDENCE='.phase2-backup/phase4-2/offline-recheck'
+$env:HFS_MULTITAB_EVIDENCE='.phase2-backup/phase4-2/multitab'
+$env:HFS_PHASE4_EVIDENCE='.phase2-backup/phase4-2/independent-validated'
+node build.mjs
+node tools/verify-source.mjs
+node --test
+node tools/mobile-browser.mjs after
+node tools/offline-browser.mjs
+node tools/phase4-browser.mjs
+node tools/multitab-browser.mjs
+git diff --check
+git status --short
+```
+
+The independent runner still records findings rather than treating exit zero as certification: inspect every `checks` entry in `summary.json`, plus errors and failed requests. Its media probe requests a rendering frame to flush headless CDP emulation, observes actual draw counts, and runs separately from heap profiling. Keyboard Enter includes its native text payload. Partial eviction uses a real worker with server-side network disconnection (tab network emulation alone did not cut off worker fetches), expects 503, then verifies explicit repair. No production refresh function or draw-count replacement is used to simulate media change.
+
+The Phase 4 and Phase 4.1 results above are historical. The initial baseline multi-tab invocation accidentally replaced four historical Phase 4.1 output files through its old default path; see the explicit deviation in [P4_02_REMEDIATION_REPORT.md](phase4/P4_02_REMEDIATION_REPORT.md). Original hashes remain in the old index; they were not rewritten to conceal the mismatch. Multi-tab and independent runner defaults now use generic scratch directories; all four runners support explicit evidence destinations. The final Phase 4.2 outputs are separately indexed, including failed development attempts. No archive, save/lock schema, engine/reward rule, production deployment or source-control history was changed. Solver work remains Phase 4.3 and overall launch remains NO-GO pending the report's remaining gates.

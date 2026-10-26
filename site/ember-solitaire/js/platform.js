@@ -27,18 +27,17 @@
 
   /* ---------- storage: Preferences survives WebView data eviction ---------- */
   async function hydrate(key) {
-    if (!native) return;
+    if (!native || !ES.Store || !ES.Store.ownsWriter) return;
     const r = await call('Preferences', 'get', { key });
     try {
       const local = root.localStorage.getItem(key);
       if (r && r.value) {
-        // prefer whichever save is newer
-        const a = JSON.parse(r.value), b = local ? JSON.parse(local) : null;
-        if (!b || (a.savedAt || 0) >= (b.savedAt || 0)) root.localStorage.setItem(key, r.value);
-      } else if (local) {
+        // The Store owns validation, conflict checks and preservation.
+        ES.Store.restoreNative(r.value);
+      } else if (local && !ES.Store.persistence.blocked) {
         await call('Preferences', 'set', { key, value: local });      // first run after migration
       }
-    } catch (e) { /* corrupted local copy: Preferences wins */ if (r && r.value) try { root.localStorage.setItem(key, r.value); } catch (e2) {} }
+    } catch (e) { /* Preserve both copies for recovery; no unguarded fallback. */ }
   }
   function persist(key, value) { if (native) call('Preferences', 'set', { key, value }); }
 

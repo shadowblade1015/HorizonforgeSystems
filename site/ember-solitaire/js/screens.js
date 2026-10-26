@@ -10,6 +10,7 @@
 
   /* ======================= GAME FLOW ===================================== */
   function newGame(suits, opts) {
+    if (!St().canEdit) { UI.saveRecovery(); return false; }
     opts = opts || {};
     const g = ES.Engine.newGame(suits, opts.daily ? { seed: St().dailySeed(opts.dailyKey), daily: true, dailyKey: opts.dailyKey } : {});
     g.run = 0;

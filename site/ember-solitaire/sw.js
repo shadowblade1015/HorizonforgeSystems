@@ -35,6 +35,9 @@ async function unknownClients(except) {
   return count;
 }
 async function retire() {
+  // Snapshot candidates before reading protection metadata. A cache created
+  // during this pass must never be deleted using an older keep-set.
+  const candidates = await caches.keys();
   const live = await windows(), meta = await caches.open(META), keep = new Set([RELEASE.id]);
   let unknown = false;
   const pending = await meta.match(pendingURL);
@@ -47,7 +50,7 @@ async function retire() {
   }
   const liveKeys = new Set(live.map(c => pinURL(c.id)));
   for (const req of await meta.keys()) if (![pendingURL, activeURL].includes(req.url) && !liveKeys.has(req.url)) await meta.delete(req);
-  if (!unknown) for (const name of await caches.keys()) {
+  if (!unknown) for (const name of candidates) {
     const id = name.slice(PREFIX.length);
     if (name.startsWith(PREFIX) && /^[a-f0-9]{64}$/.test(id) && !keep.has(id)) await caches.delete(name);
   }
@@ -68,9 +71,11 @@ async function install() {
   await retire();
   const names = (await caches.keys()).filter(n => n.startsWith(PREFIX) && /^[a-f0-9]{64}$/.test(n.slice(PREFIX.length)));
   if (!names.includes(CACHE) && names.length >= 4) throw Error('Close old game tabs before installing another release');
-  const cache = await caches.open(CACHE);
+  let cache;
   try {
     await (await caches.open(META)).put(pendingURL, new Response(RELEASE.id));
+    // Publish protection before making the candidate visible to retirement.
+    cache = await caches.open(CACHE);
     await cache.delete(marker);
     for (const entry of RELEASE.files.filter(f => f.core)) {
       const url = new URL(RELEASE.base + entry.path, self.registration.scope).href;

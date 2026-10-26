@@ -38,7 +38,7 @@ const origin='http://127.0.0.1:'+server.address().port,base=origin+'/ember-solit
 const check=(name,condition,detail)=>{checks.push({name,pass:!!condition,detail});console.log((condition?'PASS ':'FAIL ')+name);if(!condition)throw Error(name+': '+JSON.stringify(detail));};
 const rpc=(data,which='controller')=>`(async()=>{const worker=${which==='controller'?'navigator.serviceWorker.controller':which};return new Promise((resolve,reject)=>{const c=new MessageChannel(),t=setTimeout(()=>reject(Error('RPC timeout')),10000);c.port1.onmessage=e=>{clearTimeout(t);c.port1.close();resolve(e.data)};worker.postMessage(${JSON.stringify(data)},[c.port2])});})()`;
 async function boot(tab,id) {await until(()=>tab.evaluate(`window.ES?.Offline?.id===${JSON.stringify(id)}&&ES.UI?.current==='home'`),'boot '+id.slice(0,8),30000);}
-async function ready(tab,id) {await until(()=>tab.evaluate(`!!navigator.serviceWorker.controller&&${rpc({type:'STATUS'})}.then(s=>s.ok&&s.id===${JSON.stringify(id)})`),'installed core',35000);}
+async function ready(tab,id) {await until(()=>tab.evaluate(`!!navigator.serviceWorker.controller&&new URL(navigator.serviceWorker.controller.scriptURL).searchParams.get('emberProtocol')==='1'&&${rpc({type:'STATUS'})}.then(s=>s.ok&&s.id===${JSON.stringify(id)})`),'installed core',35000);}
 async function screenshot(tab,name){const r=await tab.call('Page.captureScreenshot',{format:'png'});writeFileSync(resolve(out,name+'.png'),Buffer.from(r.data,'base64'));}
 const progress=tab=>tab.evaluate('(()=>{const s=ES.Store.state,g=s.game;return {embers:s.embers,totalEmber:s.totalEmber,wins:s.stats.wins,hand:g?.settlement.handId,cols:g?.cols,stock:g?.stock,moves:g?.moves};})()');
 async function identities(tab,release,label){
@@ -115,6 +115,7 @@ try {
  check('legacy-controlled new HTML loads B immutable engine/CSS',await migrated.evaluate('self.__engineRelease==="B"&&getComputedStyle(document.documentElement).getPropertyValue("--audit-release").trim()==="B"'));
  await migrated.evaluate('ES.Offline.check()');check('legacy active tab blocks unsafe takeover',await migrated.evaluate('ES.Offline.approve()')===false);
  await legacyTab.close();await until(()=>migrated.evaluate(rpc({type:'STATUS'},'(await navigator.serviceWorker.getRegistration()).waiting')).then(s=>s.legacyClients===0),'legacy client fully closed');
+ check('legacy successor explicitly acquires saving and reloads latest progress',await migrated.evaluate('ES.Store.resumeEditing()'));
  await migrated.evaluate('ES.Offline.check()');await migrated.evaluate('void ES.Offline.approve();true');await ready(migrated,B.release.id);await boot(migrated,B.release.id);
  check('historical pre-3F upgrade preserves progress',JSON.stringify(await progress(migrated))===JSON.stringify(legacyProgress));check('historical recovery copies are never erased',await migrated.evaluate('localStorage.getItem("ember.save.v2.recovery.audit")')==='retain original');
  await identities(migrated,B.release,'B');

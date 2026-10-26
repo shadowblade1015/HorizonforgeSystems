@@ -2,10 +2,12 @@ import vm from 'node:vm';
 import { readFileSync } from 'node:fs';
 import { root } from '../tools/verify-source.mjs';
 import { resolve } from 'node:path';
+import { lockWorld } from './locks-helpers.mjs';
 export const plain = x => JSON.parse(JSON.stringify(x));
 export function harness(raw = null, options = {}) {
   const storage = new Map(raw === null ? [] : [['ember.save.v2', raw]]);
   const context = vm.createContext({
+    navigator: { locks: lockWorld().endpoint() },
     localStorage: options.unavailable ? undefined : {
       get length() { return storage.size; }, key: i => [...storage.keys()][i] ?? null,
       getItem: k => { if (options.readError) throw Error('Read denied'); return storage.get(k) ?? null; },
@@ -20,6 +22,9 @@ export function harness(raw = null, options = {}) {
     const disk = readFileSync(resolve(root, p));
     vm.runInContext(disk.toString(), context, { filename: p, timeout: 1000 });
   }
+  // Existing single-context fixtures start with a granted exclusive writer.
+  // Shared-origin/unsupported/pending cases inject their own navigator adapter.
+  if (options.acquire !== false) context.ES.Store.acquireWriter();
   return { E: context.ES.Engine, S: context.ES.Store, storage, context };
 }
 export const card = (id, rank, suit = 'S', up = true) => ({ id, rank, suit, up });

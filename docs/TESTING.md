@@ -161,3 +161,36 @@ Final build/verifier: **277 exact generated files from 144 source files**, 44 sy
 Default spades, default back/iron table, fonts and required forge environments form the core. Other suits/themes/high-resolution art require on-demand caching or explicit Download all artwork for that release. Settings > Offline & Updates exposes approval/deferral, repair and Save Recovery. Browser eviction can remove offline capability; matching online repair restores current files, while absent old deployed bytes fail closed. Neither caching nor update compatibility solves multi-tab progression conflicts. Never clear site/player data as an update step.
 
 The same-origin Chrome gate passes. Physical Safari/installed-PWA/Android lifecycle, screen-reader announcements, OS storage pressure and real Vercel routing/headers still need manual production approval checks. Read [OFFLINE_RELEASE_MATRIX.md](OFFLINE_RELEASE_MATRIX.md) for exact promises and [PHASE_3F_REPORT.md](PHASE_3F_REPORT.md) for first-migration, retention, compatible rollback and release-readiness details. No commit, merge, push or deployment was performed.
+
+## Phase 4 independent certification assessment
+
+The merged Phase 3F baseline was independently reproduced: **277 Node tests**, **13 mobile browser checks**, **41 same-origin offline upgrade checks**, build and strict source verification pass. See [phase4/RELEASE_AUDIT.md](phase4/RELEASE_AUDIT.md) and [phase4/GO_NO_GO.md](phase4/GO_NO_GO.md). All four distribution channels currently receive **NO-GO**; a stale second tab can overwrite newer progress and its backup, and required production/device evidence remains missing.
+
+The added `tests/phase4-audit.test.mjs` contributes four probes; final full suite is **281/281 executions passing**. Three explicitly labeled OBSERVED DEFECT probes pass by reproducing current data loss, not by certifying it safe; the fourth adds sampled legal-play/save invariants. Original regressions are unchanged. A remediation branch must replace the observed-loss expectations with preservation/refusal requirements after the approved fix.
+
+Run the independent generated-output browser audit after building:
+
+```powershell
+node tools/phase4-browser.mjs
+```
+
+It uses the existing isolated Chrome/CDP helper, no packages, synthetic saves and generated dist. Final results: **18 PASS and four unresolved FAIL observations** (actual two-tab loss, dynamic reduced-motion canvas, Later focus, false optional-download readiness). A successful runner exit means observations were collected; it does not mean FAIL gates passed. Runner exceptions exit nonzero. Fixed seeds avoid assuming every random opening has an immediate move. Recorded solver timing includes the actual scheduled Board path and RAF/long-task evidence; lab measurements are not real-user INP.
+
+Evidence lives in ignored `.phase2-backup/phase4/`, indexed by `evidence-index.json`, with baseline/final logs, browser summaries/screenshots, native adapter probes and performance data. The supplied Vercel main preview required authentication and was inaccessible to the connected project; deployment commit/bytes/headers/CDN remain NOT TESTED. No protection settings were changed. Physical Safari/Android/PWA and human assistive-technology checks remain separate. Production code/configuration, archive and baseline inventory were not modified during the audit; no deployment, advertising activation or source-control action was performed.
+
+## Phase 4.1 multi-tab remediation
+
+Current result: **304 Node tests pass**, zero failures/TODOs/skips. The three Phase 4 loss probes now require preservation/refusal; original pre-fix results remain in `.phase2-backup/phase4-1/pre-remediation.log` and the retained audit evidence. New deterministic cases exercise shared exclusive locks, read-only/unsupported/pending/rejected states, timing/conflicts, all replacement paths and guarded native restore. Single-context fixtures explicitly provide a granted lock; production has no bypass.
+
+After build/verifier/full Node checks, run `node tools/mobile-browser.mjs after`, `node tools/offline-browser.mjs`, and the new release gate `node tools/multitab-browser.mjs`. Final Chrome results: **13 mobile, 42 offline and 19 multi-tab checks pass**. The real multi-tab gate verifies exact primary/backup values, future/local recovery copies, visible warning/export controls, the confirmed recovery-dialog handoff, reload, actual renderer crash releasing ownership, unsupported API and one victory payout across replay.
+
+Run the independent assessment without overwriting its original evidence:
+
+```powershell
+$env:HFS_PHASE4_EVIDENCE='.phase2-backup/phase4-1/independent'
+node tools/phase4-browser.mjs
+git diff --check
+git status --short
+```
+
+It now records **19 PASS / 3 known FAIL observations**: stale-tab preservation passes; existing offline-readiness/motion/Later-focus defects remain outside this remediation. The runner's exit code is not a waiver for those FAIL gates. New evidence is ignored under `.phase2-backup/phase4-1/`, indexed separately. Report and support/rollback boundaries: [phase4/P4_01_REMEDIATION_REPORT.md](phase4/P4_01_REMEDIATION_REPORT.md). Functional secure-context Web Locks are mandatory for editing; unsupported browsers fail closed. Drain pre-4.1 tabs before rollout, and never roll back to uncoordinated Store code or an incompatible historical worker. No cross-device sync, native durability or public launch certification is claimed.

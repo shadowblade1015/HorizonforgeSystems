@@ -118,7 +118,10 @@ for(const suits of [1,2,4])test(`${suits}-suit seeded legal play/deal/undo match
   const g=E.newGame(suits,{seed:20261022}),prior=old.newGame(suits,{seed:20261022});assert.deepEqual(plain(g),plain(prior));
   function conserve(){const cards=[...g.cols.flat(),...g.stock];assert.equal(cards.length+g.completed*13,104);assert.equal(new Set(cards.map(c=>c.id)).size,cards.length);assert.deepEqual(plain(g),plain(prior));}
   for(let step=0;step<100;step++){
-    conserve();assert.deepEqual(plain(E.hints(g)),plain(old.hints(prior)));
+    conserve();
+    // Hint ranking is intentionally revised; preserve the historical legal candidate set.
+    const candidates = hs => hs.map(({from,idx,to})=>`${from}:${idx}:${to}`).sort();
+    assert.deepEqual(candidates(plain(E.hints(g))),candidates(plain(old.hints(prior))));
     const hint=E.hintBasic(g);let result,previous;
     if(step%11===0&&E.canDeal(g).ok){result=E.deal(g);previous=old.deal(prior);}
     else if(hint){result=E.move(g,hint.from,hint.idx,hint.to);previous=old.move(prior,hint.from,hint.idx,hint.to);}

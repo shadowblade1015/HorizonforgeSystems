@@ -282,6 +282,8 @@
       if (!d) d = makeCard(g.cols[ci][i]);
       const wasUp = prevUp.get(p.id);
       d.classList.toggle('sel', !!(B.sel && B.sel.col === ci && i >= B.sel.idx));
+      const previous = g.cols[ci][i - 1], current = g.cols[ci][i];
+      d.classList.toggle('suit-break', !!(previous && previous.up && current.up && previous.rank === current.rank + 1 && previous.suit !== current.suit));
       d.dataset.col = ci; d.dataset.idx = i;
       const prev = prevPos.get(p.id);
       B.pos.set(p.id, p);
@@ -612,16 +614,17 @@
     if (!list.length) {
       if (E().canDeal(g).ok) { $('#btnStock').classList.add('hint-dst'); ES.UI.toast('No useful moves — deal from the stock.'); announce('No useful moves. Deal from the stock.'); }
       else { ES.UI.toast(g.stock.length ? 'Fill the empty columns, then deal.' : 'No moves remain. Try Undo.'); }
-      B.hintTimer = later(clearHints, 2200);
+      B.hintTimer = later(clearHints, 2600);
       return;
     }
     const h = list[B.hintIdx % list.length]; B.hintIdx++;
     for (let i = h.idx; i < g.cols[h.from].length; i++) { const d = B.els.get(g.cols[h.from][i].id); d && d.classList.add('hint-src'); }
     B.hls[h.to].classList.add('hint-dst');
     const c = g.cols[h.from][h.idx];
-    announce(`Hint: move ${E().cardName(c)} from column ${h.from + 1} to column ${h.to + 1}.`);
+    const message = `Hint: move ${g.cols[h.from].length - h.idx} card(s) from ${E().cardName(c)} in column ${h.from + 1} to column ${h.to + 1}.`;
+    ES.UI.toast(message, 'hint', 2600); announce(message);
     ES.Audio.play('ui');
-    B.hintTimer = later(clearHints, 2200);
+    B.hintTimer = later(clearHints, 2600);
   }
 
   /* ---------- selection (tap) --------------------------------------------- */

@@ -35,7 +35,7 @@
     document.addEventListener('pointerdown', () => ES.Audio.unlock(), { once: true, capture: true });
     document.addEventListener('keydown', () => ES.Audio.unlock(), { once: true, capture: true });
     document.addEventListener('visibilitychange', () => { if (document.hidden) St.save(true); });
-    root.addEventListener('pagehide', () => { St.save(true); St.releaseWriter(); });
+    root.addEventListener('pagehide', () => { if (ES.Platform.native) void St.flushSave().finally(() => St.releaseWriter()); else { St.save(true); St.releaseWriter(); } });
 
     // critical preload: branding, current table/back, current environment, current suits
     const s = St.state.settings;

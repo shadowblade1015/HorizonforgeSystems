@@ -87,7 +87,7 @@ try {
  await a.call('Storage.overrideQuotaForOrigin',{origin,quotaSize:1});
  const quota=await a.evaluate('(async()=>{try{const c=await caches.open("hfs-quota-audit");await c.put("/quota",new Response(new Uint8Array(1048576)));return "allowed"}catch(e){return e.name}})()');
  check('real browser CacheStorage quota exhaustion reproduced',quota==='QuotaExceededError',quota);
- await a.evaluate('ES.Offline.downloadAll()');check('quota failure is visible without claiming optional success',await a.evaluate('document.querySelector(".offline-status").textContent.includes("could not")'));
+ const quotaDownload=await a.evaluate(rpc({type:'DOWNLOAD'}));check('legacy DOWNLOAD quota failure cannot acknowledge success',!quotaDownload.ok);
  await a.call('Storage.overrideQuotaForOrigin',{origin});await a.evaluate('caches.delete("hfs-quota-audit")');
  // Inject a Cache.put failure inside the actual active worker, separately labelled.
  await a.evaluate(rpc({type:'STATUS'}));const targets=await chrome.send('Target.getTargets');let attached;
@@ -96,8 +96,8 @@ try {
  }
  if(!attached)throw Error('No running B worker target');
  await chrome.send('Runtime.evaluate',{expression:'self.auditPut=Cache.prototype.put;Cache.prototype.put=function(){return Promise.reject(new DOMException("Injected write failure","QuotaExceededError"))};'},attached.sessionId);
- await a.evaluate('ES.Offline.downloadAll()');check('fault-injected worker cache-write failure is visible',await a.evaluate('document.querySelector(".offline-status").textContent.includes("could not")'));
- await chrome.send('Runtime.evaluate',{expression:'Cache.prototype.put=self.auditPut;'},attached.sessionId);await a.evaluate('ES.Offline.downloadAll()');check('optional download recovers after write failures',await a.evaluate('document.querySelector(".offline-status").textContent.includes("all supported modes and artwork are available offline")'));
+ const failedDownload=await a.evaluate(rpc({type:'DOWNLOAD'}));check('legacy DOWNLOAD cache-write failure cannot acknowledge success',!failedDownload.ok);
+ await chrome.send('Runtime.evaluate',{expression:'Cache.prototype.put=self.auditPut;'},attached.sessionId);const recoveredDownload=await a.evaluate(rpc({type:'DOWNLOAD'}));check('legacy DOWNLOAD recovers after write failures',recoveredDownload.ok);
  const ownCache='ember-solitaire:'+encodeURIComponent(base)+':release-v1:'+B.release.id;
  await a.evaluate(`caches.open(${JSON.stringify(ownCache)}).then(c=>c.delete(${JSON.stringify(origin+B.release.base+'js/engine.js')}))`);network=false;
  const evicted=await a.evaluate(`fetch(${JSON.stringify(origin+B.release.base+'js/engine.js')}).then(async r=>{await r.arrayBuffer();return r.status})`);

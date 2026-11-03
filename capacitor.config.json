@@ -1,0 +1,19 @@
+{
+  "appId": "com.horizonforgesystems.embersolitaire",
+  "appName": "Ember Solitaire",
+  "webDir": "www",
+  "android": {
+    "allowMixedContent": false
+  },
+  "ios": {
+    "contentInset": "automatic"
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchAutoHide": true
+    },
+    "CapacitorHttp": {
+      "enabled": false
+    }
+  }
+}

@@ -210,8 +210,8 @@
   const WRITER_LOCK = KEY + '.writer.v1';
   let writer = false, conflict = false, loaded = false, expectedRaw = null, expectedBackup = null;
   let ownership = 'uninitialized', acquireTask = null, releaseLock = null, generation = 0;
-  let conflictMemory = null, conflictStored = null;
-  function editable() { return writer && loaded && !conflict; }
+  let conflictMemory = null, conflictStored = null, releaseRequested = false;
+  function editable() { return writer && loaded && !conflict && !releaseRequested; }
   function readOnlyStatus() {
     const unsupported = ownership === 'unsupported';
     status(unsupported ? 'unsupported' : conflict ? 'conflict' : 'readonly', unsupported
@@ -220,7 +220,7 @@
       : 'Read-only: another tab may own saving. Close that tab, then use Resume editing to reload the latest progress. Export remains available.');
   }
   function acquireWriter() {
-    if (writer) return Promise.resolve(true);
+    if (writer) return Promise.resolve(!releaseRequested);
     if (acquireTask) return acquireTask;
     const locks = root.navigator && root.navigator.locks;
     if (!locks || typeof locks.request !== 'function') { ownership = 'unsupported'; readOnlyStatus(); return Promise.resolve(false); }
@@ -237,7 +237,7 @@
         // A late callback after timeout/release must not turn into a hidden owner.
         if (ticket !== generation || done) return;
         if (!lock) { ownership = 'readonly'; readOnlyStatus(); complete(false); return; }
-        writer = true; loaded = false; ownership = 'writer';
+        writer = true; releaseRequested = false; loaded = false; ownership = 'writer';
         const held = new Promise(resolve => { releaseLock = resolve; });
         complete(true);
         emit({ type: 'ownership' });
@@ -250,6 +250,19 @@
     return result;
   }
   function releaseWriter() {
+    if (ES.Platform?.native && writer) {
+      if (releaseRequested) return;
+      releaseRequested = true; clearTimeout(saveT); ownership = 'releasing'; readOnlyStatus();
+      // A bridge write already accepted by the OS cannot be cancelled by JS.
+      // Hold the actual Web Lock until the complete queue settles, while
+      // refusing new edits/acquisition in this context.
+      Promise.resolve(ES.Platform.flush()).then(releaseWriterNow, releaseWriterNow);
+      return;
+    }
+    releaseWriterNow();
+  }
+  function releaseWriterNow() {
+    releaseRequested = false;
     generation++; clearTimeout(saveT); acquireTask = null;
     writer = false; ownership = 'released';
     if (releaseLock) releaseLock(); releaseLock = null;
@@ -339,6 +352,29 @@
     if (S.game) copy.game = Object.assign({}, S.game, { history: S.game.history.slice(-20) });
     return copy;
   }
+  let mirrorRevision = 0;
+  function nativeFailure(raw, message) {
+    if (raw !== null) try { quarantine(raw); } catch (_) { /* Original native raw remains untouched. */ }
+    status('unsaved', 'Native storage: ' + message + '. Local progress retained; export Save Recovery before leaving.');
+  }
+  function mirrorNative(json) {
+    if (!ES.Platform?.native) return;
+    const revision = ++mirrorRevision, copies = {};
+    try {
+      const store = storage();
+      for (let i = 0; i < store.length; i++) { const key = store.key(i); if (key === BACKUP_KEY || key?.startsWith(RECOVERY_PREFIX)) copies[key] = store.getItem(key); }
+      status('pending', 'Saving native progress…');
+      Promise.resolve(ES.Platform.persist(KEY, json, copies)).then(ok => {
+        if (revision !== mirrorRevision || expectedRaw !== json || blocked || !editable()) return;
+        if (ok) status('saved', '', false); else nativeFailure(null, 'Write not acknowledged');
+      }, () => nativeFailure(null, 'Write failed'));
+    } catch (_) { nativeFailure(null, 'Write failed'); }
+  }
+  async function flushSave() {
+    if (!save(true)) return false;
+    if (ES.Platform?.native) await ES.Platform.flush();
+    return !persistence.unsaved && !persistence.blocked;
+  }
   function writeProfile(profile) {
     if (!canReplace()) return false;
     const checked = validateProfile(profile);
@@ -352,8 +388,7 @@
     lastGoodRaw = json;
     S.savedAt = profile.savedAt;
     status('saved', '', false);
-    // Optional native mirror is not the web durability acknowledgement.
-    try { if (ES.Platform) ES.Platform.persist(KEY, json); } catch (e) { /* local write succeeded */ }
+    mirrorNative(json);
     return true;
   }
   function save(now) {
@@ -382,7 +417,7 @@
       store.setItem(KEY, json);
       expectedRaw = json;
       blocked = false; recoverable = false; lastGoodRaw = json; S.savedAt = profile.savedAt;
-      status('saved', 'Recovered progress saved. Original recovery copy retained.', false);
+      status('saved', 'Recovered progress saved. Original recovery copy retained.', false); mirrorNative(json);
       return true;
     } catch (e) { status('recovery', 'Recovery could not be saved. The original is still protected. Export before leaving.'); return false; }
   }
@@ -425,7 +460,7 @@
       emit({ type: 'beforeGameChange' });
       S = next; ensureProgress(S.artifact); originalRaw = existing;
       blocked = false; recoverable = false; lastGoodRaw = json;
-      status('saved', 'Imported save. Previous progress retained in recovery storage.', false);
+      status('saved', 'Imported save. Previous progress retained in recovery storage.', false); mirrorNative(json);
       emit({ type: 'import' });
       return true;
     } catch (e) { status(blocked ? persistence.code : 'unsaved', 'Import failed. Current progress was kept. Check the file or export before leaving.'); return false; }
@@ -444,7 +479,7 @@
       store.setItem(KEY, JSON.stringify(next));
       expectedRaw = JSON.stringify(next);
       emit({ type: 'beforeGameChange' });
-      S = next; lastGoodRaw = JSON.stringify(next); status('saved', '', false); emit({ type: 'reset' });
+      S = next; lastGoodRaw = JSON.stringify(next); status('saved', '', false); mirrorNative(expectedRaw); emit({ type: 'reset' });
       return true;
     } catch (e) { status('unsaved', 'Reset could not be saved. Existing progress was kept. Export before leaving.'); return false; }
   }
@@ -644,7 +679,7 @@
     validateHand, validateProfile, recoveryCopies, exportRecovery, acceptRecovery, exportSave, exportOriginal, exportBackup, inspectImport, importSave, RECOVERY_PREFIX, BACKUP_KEY,
     current, heatPct, ready, cost, costFor, pctFor, levelProgress, addEmber, strike, selectArtifact, artifactState,
     startGame, abandonGame, applyResult, tick, favoriteSuits, dailyFor, dailySeed,
-    reset, acquireWriter, releaseWriter, resumeEditing, restoreNative,
+    reset, acquireWriter, releaseWriter, resumeEditing, restoreNative, flushSave, nativeFailure,
     get canEdit() { return editable(); }, get ownsWriter() { return writer; }, get ownership() { return ownership; },
     exportStored() { return storage().getItem(KEY); },
     get conflictMemory() { return conflictMemory; }, get conflictStored() { return conflictStored; }

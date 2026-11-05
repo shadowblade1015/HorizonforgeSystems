@@ -1,0 +1,35 @@
+// Local release migration and native-bundle browser smoke, never a native-device claim.
+import {createServer} from 'node:http';import {mkdirSync,writeFileSync} from 'node:fs';import {resolve,extname} from 'node:path';import {pathToFileURL} from 'node:url';import {execFileSync} from 'node:child_process';
+import {readTree,root} from './verify-source.mjs';import {generate} from './release.mjs';import {chromeAudit,until} from './chrome-audit.mjs';
+const out=resolve(root,process.env.HFS_PLAYABLE_EVIDENCE||'.phase2-backup/playable/acceptance');mkdirSync(out,{recursive:true});
+const current=readTree(resolve(root,'site')),prior=new Map(current),sha='6f831f0b7a69c8f5977fbe069b4f52fee0675177';
+for(const p of execFileSync('git',['diff','--name-only',sha,'--','site'],{cwd:root,encoding:'utf8',windowsHide:true}).trim().split(/\r?\n/).filter(Boolean))prior.set(p.slice(5),execFileSync('git',['show',sha+':'+p],{cwd:root,windowsHide:true}));
+const generator=resolve(out,'prior-release.mjs');writeFileSync(generator,execFileSync('git',['show',sha+':tools/release.mjs'],{cwd:root,windowsHide:true}));
+const A=(await import(pathToFileURL(generator).href)).generate(prior),B=generate(current),native=readTree(resolve(root,'www'));let deployed=A.output,chrome,tab;const checks=[];
+if(A.release.id!=='e759216677bd42a3d9659c143c0a5b8be0e583844c3650fdb7970f40d8e59809')throw Error('Historical baseline mismatch');
+const server=createServer((req,res)=>{const path=new URL(req.url,'http://localhost').pathname.slice(1);const key=path.endsWith('/')?path+'index.html':path;const bytes=key.startsWith('native/')?native.get(key.slice(7)):deployed.get(key);res.writeHead(bytes?200:404,{'Cache-Control':'no-store','Content-Type':({'.js':'text/javascript','.html':'text/html','.css':'text/css','.woff2':'font/woff2','.png':'image/png','.webp':'image/webp'})[extname(key)]||'application/json'});res.end(bytes||'Missing')});await new Promise(r=>server.listen(0,'127.0.0.1',r));const origin='http://127.0.0.1:'+server.address().port,base=origin+'/ember-solitaire/';
+function check(name,pass,detail){checks.push({name,pass:!!pass,detail});console.log((pass?'PASS ':'FAIL ')+name);if(!pass)throw Error(name)}
+const rpc=data=>`new Promise((resolve,reject)=>{const c=new MessageChannel(),t=setTimeout(()=>{c.port1.close();reject(Error('RPC deadline'))},12000);c.port1.onmessage=e=>{clearTimeout(t);c.port1.close();resolve(e.data)};navigator.serviceWorker.controller.postMessage(${JSON.stringify(data)},[c.port2])})`;
+const snapshot=()=>tab.evaluate('(()=>{const s=JSON.parse(JSON.stringify(ES.Store.state));delete s.savedAt;return JSON.stringify(s)})()');
+async function boot(id){await until(()=>tab.evaluate(`ES?.Offline?.id===${JSON.stringify(id)}&&ES.Store.canEdit&&ES.UI.current==='home'&&!!navigator.serviceWorker.controller`),'boot '+id,45000)}
+try{
+ chrome=await chromeAudit();const browser=await chrome.send('Browser.getVersion');
+ tab=await chrome.tab();await tab.navigate(base+'?nosw&screen=home');await until(()=>tab.evaluate('ES?.UI?.current==="home"&&ES.Store.canEdit'),'online without worker');
+ for(const suits of [1,2,4]){await tab.evaluate(`ES.Store.state.settings.reduced=true;ES.Screens.newGame(${suits});ES.Store.save(true)`);check('online no-worker '+suits+' suit playable',await tab.evaluate('ES.Store.validateHand(ES.Store.state.game)&&!navigator.serviceWorker.controller'));}
+ check('no offline or artwork UI without worker',await tab.evaluate('!document.querySelector(".offline-status")&&!document.body.textContent.includes("Download all artwork")'));await tab.close();
+ tab=await chrome.tab();await tab.navigate(base+'?screen=home');await boot(A.release.id);await until(()=>tab.evaluate(rpc({type:'STATUS'})).then(s=>s.ok),'baseline ready');
+ await tab.evaluate('ES.Offline.defer();ES.Store.state.ftue.intro=true;ES.Store.state.settings.reduced=true;ES.Store.addEmber(123);ES.Store.startGame(ES.Engine.newGame(4,{seed:42}));ES.Store.save(true);localStorage.setItem("ember.save.v2.recovery.playable","original raw")');const before=await snapshot();
+ deployed=new Map([...A.output,...B.output]);await tab.evaluate('ES.Offline.check()');await until(()=>tab.evaluate(`ES.Offline.target===${JSON.stringify(B.release.id)}`),'waiting playable release',45000);
+ check('waiting release leaves old hand unchanged',await snapshot()===before);await tab.evaluate('void ES.Offline.approve();true');await boot(B.release.id);
+ check('certified worker upgrade preserves complete profile and receipt',await snapshot()===before);
+ check('recovery raw and writer survive legacy worker upgrade',await tab.evaluate('ES.Store.canEdit&&localStorage.getItem("ember.save.v2.recovery.playable")==="original raw"&&ES.Store.save(true)'));
+ check('normal game has no routine update banner',await tab.evaluate('document.querySelector(".offline-status").hidden&&!document.body.textContent.includes("Download all artwork")'));
+ await tab.evaluate('ES.UI.go("settings")');await tab.evaluate('ES.Offline.check()');check('Settings exposes updates and recovery',await tab.evaluate('!document.querySelector(".offline-status").hidden&&[...document.querySelectorAll(".offline-status button")].some(b=>b.textContent==="Save Recovery")'));await tab.close();
+ const context=await chrome.send('Target.createBrowserContext');tab=await chrome.tab(context.browserContextId);await tab.navigate(origin+'/native/?screen=home');await until(()=>tab.evaluate('ES?.UI?.current==="home"&&ES.Store.canEdit'),'native bundle boot');
+ for(const suits of [1,2,4]){await tab.evaluate(`ES.Screens.newGame(${suits});ES.Store.save(true)`);check('bundled '+suits+' suit starts',await tab.evaluate('ES.Store.validateHand(ES.Store.state.game)'));}
+ check('native paths omit hosted releases and registration',await tab.evaluate('ES.Build.native&&!ES.Offline&&document.baseURI.includes("/native/")&&[...document.scripts].every(s=>s.src.startsWith(location.origin+"/native/"))'));
+ const worker=await tab.evaluate('new Promise((resolve,reject)=>{const w=new Worker("js/stuck-worker.js");w.onerror=e=>{w.terminate();reject(Error(e.message))};w.onmessage=e=>{w.terminate();resolve(e.data)};w.postMessage({type:"endgame",id:1,cols:[[],[],[],[],[],[],[],[],[],[]],stock:[],completed:0});setTimeout(()=>{w.terminate();resolve({deadline:true})},5000)})');check('bundled solver worker resolves using local imports',!!worker&&!worker.deadline,worker);
+ check('bundled fonts and privacy route resolve',await tab.evaluate('(async()=>{await document.fonts.ready;return document.fonts.status==="loaded"&&(await fetch("privacy.html")).ok})()'));
+ const unexpected=chrome.events.filter(e=>e.method==='Network.requestWillBeSent').map(e=>e.params.request.url).filter(u=>/^https?:/.test(u)&&!u.startsWith(origin));check('no unexpected external or advertising requests',unexpected.length===0,unexpected);
+ writeFileSync(resolve(out,'summary.json'),JSON.stringify({browser,A:A.release.id,B:B.release.id,checks},null,2));
+}catch(e){writeFileSync(resolve(out,'failure.json'),JSON.stringify({error:e.stack,checks},null,2));console.error(e);process.exitCode=1}finally{await chrome?.close();server.close();server.closeAllConnections()}

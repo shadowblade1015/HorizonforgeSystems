@@ -103,35 +103,31 @@ test('STATUS separates core launch capability from optional artwork availability
  await(await w.storage.open(w.t.CACHE)).delete(new URL(w.release.base+'js/engine.js',scope).href);
  s=(await w.run('message',{data:{type:'STATUS'}})).reply;assert.equal(s.ok,false);assert.equal(s.artworkOk,true);
 });
-for(const core of [true,false])for(const download of [true,false])test(`artwork download core=${core} success=${download} reports verified capability`,async()=>{
- const h=capabilityClient({core,download});await h.api.start();await h.api.downloadAll();
- assert.match(h.message(),core?(download?/all supported modes/:/Some optional artwork/):/Repair offline files/);
- if(!core)assert.doesNotMatch(h.message(),/available offline|Offline ready:/);
- assert.equal(h.calls.filter(c=>c.type==='STATUS').length,3);
+for(const core of [true,false])for(const artwork of [true,false])test(`Settings-only update status core=${core} artwork=${artwork} makes no offline promise`,async()=>{
+ const h=capabilityClient({core,artwork});await h.api.start();
+ const panel=h.document.querySelector('.offline-status');assert.equal(panel.hidden,true);
+ assert.equal(h.api.downloadAll,undefined);assert.equal(panel.children.some(b=>/Download/i.test(b.textContent)),false);
+ assert.doesNotMatch(h.message(),/all supported modes|available offline|Download/);
+ await h.api.check();assert.equal(panel.hidden,false);assert.match(h.message(),core?/verified/:/unavailable/);
 });
-test('core-ready initial status describes optional incompleteness and completed artwork separately',async()=>{
- for(const artwork of [false,true]){const h=capabilityClient({artwork});await h.api.start();assert.match(h.message(),artwork?/all supported modes/:/Other artwork needs/);}
+for(const repair of [true,false])test(`repair success=${repair} verifies current legacy files`,async()=>{
+ const h=capabilityClient({core:false,repair});await h.api.start();await h.api.repair();assert.match(h.message(),repair?/verified/:/could not complete/);
 });
-for(const repair of [true,false])test(`repair success=${repair} never invents readiness`,async()=>{
- const h=capabilityClient({core:false,repair});await h.api.start();await h.api.repair();assert.match(h.message(),repair?/Offline ready:/:/could not complete/);
+test('successful REPAIR still requires fresh STATUS',async()=>{
+ const h=capabilityClient({core:false}),original=h.active.postMessage;
+ h.active.postMessage=(d,p)=>d.type==='REPAIR'?p[0].postMessage({ok:true}):original(d,p);
+ await h.api.start();await h.api.repair();assert.match(h.message(),/unavailable/);
 });
-test('successful REPAIR acknowledgement still needs a fresh ready STATUS',async()=>{
- const h=capabilityClient({core:false});const original=h.active.postMessage;
- h.active.postMessage=(data,ports)=>data.type==='REPAIR'?ports[0].postMessage({ok:true}):original(data,ports);
- await h.api.start();await h.api.repair();assert.match(h.message(),/Core offline files are incomplete/);
+test('wrong-release STATUS refuses repair',async()=>{
+ const h=capabilityClient({wrong:true});await h.api.start();await h.api.repair();assert.equal(h.calls.some(c=>c.type==='REPAIR'),false);
 });
-test('wrong-release STATUS refuses downloads and repair',async()=>{
- const h=capabilityClient({wrong:true});await h.api.start();await h.api.downloadAll();assert.match(h.message(),/could not be verified/);await h.api.repair();
- assert.equal(h.calls.some(c=>['DOWNLOAD','REPAIR'].includes(c.type)),false);
-});
-test('STATUS timeout cannot promise offline readiness',async()=>{
+test('STATUS timeout never invents verified files',async()=>{
  const h=capabilityClient();await h.api.start();h.active.postMessage=()=>{};
- const pending=h.api.downloadAll();h.clock.advance(12001);await pending;assert.match(h.message(),/could not be verified/);assert.doesNotMatch(h.message(),/available offline/);
+ const pending=h.api.repair();h.clock.advance(12001);await pending;assert.match(h.message(),/could not complete/);
 });
-test('post-download STATUS failure preserves the download uncertainty instead of claiming all modes',async()=>{
- const h=capabilityClient();await h.api.start();const original=h.active.postMessage;let downloaded=false;
- h.active.postMessage=(data,ports)=>{if(data.type==='DOWNLOAD')downloaded=true;if(data.type==='STATUS'&&downloaded)ports[0].postMessage({id:'b'.repeat(64),ok:true,artworkOk:true});else original(data,ports);};
- await h.api.downloadAll();assert.match(h.message(),/Artwork may have downloaded/);assert.doesNotMatch(h.message(),/available offline/);
+test('registration failure leaves game and recovery usable',async()=>{
+ const h=client();h.context.navigator.serviceWorker.register=async()=>{throw Error('Denied')};await h.api.start();
+ assert.equal(h.document.querySelector('.offline-status').hidden,true);assert.equal(h.S.canEdit,true);assert.equal(h.S.save(true),true);assert.equal(h.reloads,0);
 });
 test('Later integrates with shared focus restoration and retains polite status semantics',async()=>{
  const h=capabilityClient();await h.api.start();const invoker=new h.Element('button');h.get('#scr-game').appendChild(invoker);invoker.focus();await h.api.check();

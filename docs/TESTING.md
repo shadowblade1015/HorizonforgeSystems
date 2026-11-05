@@ -1,3 +1,31 @@
+# Playable baseline — current review workflow
+
+November 3, 2026. This section supersedes offline-product UI expectations in the historical sections below. Web play is online-first; the certified worker is retained for compatibility. See [baseline report](EMBER_PLAYABLE_BASELINE_REPORT.md), [native readiness](EMBER_NATIVE_RELEASE_READINESS.md) and [cleanup register](EMBER_CODE_CLEANUP_REGISTER.md).
+
+Run from the separate playable worktree. Choose new evidence directories for later browser runs to preserve the current review artifacts.
+
+```powershell
+npm ci
+node build.mjs
+node tools/verify-source.mjs
+node --test
+npm run build:native
+npx cap sync
+node tools/mobile-browser.mjs after
+node tools/multitab-browser.mjs
+node tools/solver-browser.mjs
+node tools/phase4-browser.mjs
+node tools/playable-browser.mjs
+node tools/offline-browser.mjs
+git diff --check
+```
+
+Use HFS_MOBILE_EVIDENCE, HFS_MULTITAB_EVIDENCE, HFS_SOLVER_EVIDENCE, HFS_PHASE4_EVIDENCE, HFS_PLAYABLE_EVIDENCE and HFS_OFFLINE_EVIDENCE for separate outputs. Independent browser exit zero only means collection completed: require every check PASS and inspect errors/failed requests. The legacy offline suite's direct DOWNLOAD messages are protocol tests, not player controls or renewed offline promises. Native bundled-browser tests use local HTTP and browser Web Locks; actual Capacitor plugins/WKWebView need device validation. Native protocol tests use deterministic adapters and explicitly test missing ownership/plugins and future saves.
+
+Baseline was 352 passing Node tests. Eleven obsolete optional-artwork UI cases are replaced by ten Settings-only/repair/registration cases; worker protocol and unrelated regression assertions stay. Fifteen new packaging/persistence/provider cases produce 366 total. Android debug build is attempted with android/gradlew.bat -p android assembleDebug; this host lacks Java/SDK. iOS requires macOS/Xcode. No native pass is inferred from browser emulation.
+
+---
+
 # Testing, source ownership and recovery
 
 Updated October 25, 2026. Node 24 is the tested baseline. Built-in Node modules only; no install step. Earlier phase counts below are historical execution records; current Phase 3F results appear at the end.

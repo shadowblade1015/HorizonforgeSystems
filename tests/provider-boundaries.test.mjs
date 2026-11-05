@@ -1,0 +1,7 @@
+import test from 'node:test';import assert from 'node:assert/strict';import vm from 'node:vm';import {readFileSync} from 'node:fs';
+test('web and native ad providers remain disabled even with query flags or tuning',async()=>{
+ for(const native of [false,true]){let calls=0;const c=vm.createContext({location:{search:'?ads=mock'},ES:{Build:{native,adsEnabled:false},Platform:{native,plugin(){calls++;throw Error('No SDK allowed')}},Config:{bool:()=>true}},setTimeout(){}});vm.runInContext(readFileSync(new URL('../site/ember-solitaire/js/ads.js',import.meta.url),'utf8'),c);await c.ES.Ads.init();assert.equal(c.ES.Ads.state.status,'off');assert.equal(calls,0);assert.equal(c.ES.Ads.rewardedAvailable(),false);assert.equal(c.ES.AdProviders.web,null);}
+});
+test('analytics/crash/remote-config never invoke native plugins before privacy implementation',async()=>{
+ let calls=0;const c=vm.createContext({addEventListener(){},ES:{Build:{native:true,firebase:true},Platform:{call(){calls++},plugin(){calls++}}}});vm.runInContext(readFileSync(new URL('../site/ember-solitaire/js/analytics.js',import.meta.url),'utf8'),c);c.ES.Analytics.log('game_start');c.ES.Analytics.nonFatal(Error('sample'),'test');c.ES.Analytics.setKey('test','value');await c.ES.Analytics.applyConsent({canRequestAds:true});await c.ES.Analytics.fetchRemoteConfig();assert.equal(calls,0);assert.equal(c.ES.Analytics.recent().length,2);
+});

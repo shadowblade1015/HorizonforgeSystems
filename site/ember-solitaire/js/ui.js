@@ -144,9 +144,9 @@
 
   /* ---------- toast --------------------------------------------------------- */
   let toastT = 0;
-  function toast(msg, kind) {
+  function toast(msg, kind, duration = 2200) {
     const t = $('#toast'); t.textContent = msg; t.className = 'toast is-in' + (kind ? ' ' + kind : '');
-    clearTimeout(toastT); toastT = setTimeout(() => (t.className = 'toast'), 2200);
+    clearTimeout(toastT); toastT = setTimeout(() => (t.className = 'toast'), duration);
   }
 
   /* ---------- sheets (modal dialogs) --------------------------------------- */

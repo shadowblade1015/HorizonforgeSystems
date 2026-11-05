@@ -75,6 +75,7 @@
   /* ---------- rules (verbatim semantics) ---------------------------------- */
   // A run may be lifted from idx if every card is face up, same suit, descending by one.
   function movable(col, idx) {
+    if (!Number.isInteger(idx) || idx < 0 || idx >= col.length) return false;
     const x = col.slice(idx);
     if (!x.length || x.some(c => !c.up)) return false;
     for (let i = 0; i < x.length - 1; i++)
@@ -198,7 +199,7 @@
             if (alreadyHome && sameSuit) continue;               // identical position elsewhere
             if (revealsDown) score += 60;
             if (emptiesSource) score += 45;
-            if (sameSuit) score += 30;
+            if (sameSuit) score += 100;
             if (below && below.up && !alreadyHome) score += 12;  // frees a card that may accept others
             score += (col.length - i);                            // longer runs first
           }

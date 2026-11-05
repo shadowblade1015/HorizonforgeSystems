@@ -1,0 +1,19 @@
+{
+  "date": "2026-11-03",
+  "branch": "fix/ember-suit-hint-readability",
+  "baseline": "b895c61a5abcf2b3f75df682e89f332a1445851d",
+  "sourceCommit": "95d9cfa4d4f7ac80f21d7eaa25d26207092a1715",
+  "release": "4b649bc748dba5ebd138f457296519f1a29ed260423ba9ef890dea04a3b446a5",
+  "bundles": [
+    {
+      "name": "ember-web.zip",
+      "path": ".phase2-backup/suit-hint/release/ember-web.zip",
+      "sha256": "0af7a3c57e6c615714356aff53b47bd370c463f5809f988f4ef4f3f08d7c8c50"
+    },
+    {
+      "name": "ember-native-assets.zip",
+      "path": ".phase2-backup/suit-hint/release/ember-native-assets.zip",
+      "sha256": "5541ebbad8066e236b738afe8a77de5fe37c6415a2f7645658beebdfef2f118f"
+    }
+  ]
+}

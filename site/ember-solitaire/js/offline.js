@@ -2,8 +2,9 @@
 (function (root) {
   'use strict';
   const ES = root.ES = root.ES || {};
-  let registration, id, scope, banner, message, update, download, deferred = false, approving = false;
+  let registration, id, scope, banner, message, update, deferred = false, approving = false;
   let releaseHold = () => {}, reloadTarget = null, reloadTimer, reloading = false;
+  let returnFocus, opened = false;
   const supports = worker => { try { return new URL(worker.scriptURL).searchParams.get('emberProtocol') === '1'; } catch (_) { return false; } };
   const text = value => { if (message) message.textContent = value; };
   function rpc(worker, data, timeout = 12000) {
@@ -20,34 +21,44 @@
       try { await rpc(worker, { type: 'HELLO', id }, 1200); } catch (_) { /* Legacy workers have no release protocol. */ }
     }
   }
-  function show(value) { text(value); if (banner && !deferred) banner.hidden = false; }
+  function show(value) { text(value); if (banner) banner.hidden = !opened || deferred; }
+  async function currentStatus(worker) {
+    const status = await rpc(worker, { type: 'STATUS' });
+    if (status.id !== id) throw Error('Update this tab first');
+    return status;
+  }
+  function capability(status) {
+    return status.ok ? 'Game files verified. Online play is recommended.' : 'Some cached game files are unavailable. Online play can continue; use Repair game files if needed.';
+  }
   async function check() {
-    if (!registration) return;
+    if (!registration || approving) return;
     await hello();
-    const worker = registration.waiting || navigator.serviceWorker.controller || registration.active;
-    if (!supports(worker)) { show('Preparing the offline release. Older tabs can continue playing; check again after installation.'); return; }
+    const waiting = registration.waiting;
+    const worker = waiting || navigator.serviceWorker.controller || registration.active;
+    if (!supports(worker)) { show('Checking game update compatibility. Online play can continue.'); return; }
     try {
       const status = await rpc(worker, { type: 'STATUS' });
+      if (approving) return;
+      if (registration.waiting !== waiting) { void check(); return; }
       if (!/^[a-f0-9]{64}$/.test(status.id)) throw Error('Unknown release');
-      reloadTarget = status.id !== id || registration.waiting ? status.id : null;
+      reloadTarget = status.id !== id || waiting ? status.id : null;
       update.hidden = !reloadTarget; update.disabled = !status.ok || status.legacyClients > 0;
       if (reloadTarget) { deferred = false; show(status.legacyClients > 0 ? 'Close other older game tabs before updating, then check again in Settings. Their progress is not coordinated. Save Recovery remains available.' : 'An update is ready. Update & reload saves your progress first. Other tabs keep their current release; saves between tabs may conflict.'); }
-      else if (status.ok) show('Offline ready: one suit, default back/table, fonts and forge screens. Other artwork needs a connection or Download all artwork.');
-      else show('Offline files are incomplete or were evicted. Stay online and retry installation; keep recovery exports.');
-    } catch (_) { show('Offline installation is not ready. Keep this page open and retry online.'); }
+      else show(capability(status));
+    } catch (_) { show('Game update check unavailable. Online play can continue.'); }
   }
   function unblock(value) {
     approving = false; clearTimeout(reloadTimer); releaseHold(); releaseHold = () => {};
     update.disabled = false; show(value);
   }
   async function finishReload(expected) {
-    if (!approving || reloading) return;
+    if (!approving || reloading || expected !== reloadTarget) return;
     // A historical controller has no message protocol. Wait for takeover;
     // sending it a STATUS port would only time out and cancel this approval.
     if (!supports(navigator.serviceWorker.controller)) return;
     try {
       const status = await rpc(navigator.serviceWorker.controller, { type: 'STATUS' });
-      if (status.id !== expected || !status.ok) return;
+      if (!approving || reloading || status.id !== expected || !status.ok) return;
       if (!ES.Store.save(true) || ES.Store.persistence.blocked || ES.Store.persistence.unsaved) { unblock('Update paused: saving failed. Use Save Recovery or export progress before retrying.'); return; }
       if (!reloading) { reloading = true; location.reload(); }
     } catch (_) { unblock('Update did not complete. Your current game is still open; retry online.'); }
@@ -78,41 +89,35 @@
       return true;
     } catch (_) { unblock('Update unavailable. Your saved and in-memory progress remain intact. Retry online.'); return false; }
   }
-  function defer() { if (approving) return; deferred = true; banner.hidden = true; }
-  async function downloadAll() {
-    if (!registration || download.disabled) return;
-    download.disabled = true; show('Downloading optional artwork. Keep this page open.');
-    try {
-      // Ask the page's release worker only; another release must never fill it.
-      const worker = navigator.serviceWorker.controller, status = await rpc(worker, { type: 'STATUS' });
-      if (status.id !== id) throw Error('Update this tab first');
-      const result = await rpc(worker, { type: 'DOWNLOAD' }, 180000);
-      show(result.ok ? 'All artwork downloaded for this release. All suit modes, backs and tables are available offline.' : 'Some optional artwork could not be stored. Core offline play is unchanged. Reconnect and retry; storage may be full.');
-    } catch (_) { show('Optional download did not complete. Reconnect and retry, or update this tab first. Core files were not cleared.'); }
-    finally { download.disabled = false; }
+  function defer() {
+    if (approving) return;
+    const focused = banner?.contains?.(document.activeElement);
+    deferred = true; banner.hidden = true;
+    if (focused) ES.UI.restoreScreenFocus(returnFocus);
+    returnFocus = null;
   }
   async function repair() {
     try {
-      const worker = navigator.serviceWorker.controller, status = await rpc(worker, { type: 'STATUS' });
-      if (status.id !== id) { show('Update this tab before repairing offline files.'); return; }
+      const worker = navigator.serviceWorker.controller;
+      await currentStatus(worker);
       show('Repairing offline files. Keep this page open.');
       const result = await rpc(worker, { type: 'REPAIR' }, 180000);
       if (!result.ok) throw Error('Repair failed');
-      await check();
+      const status = await currentStatus(worker);
+      show(capability(status));
     } catch (_) { show('Offline repair could not complete. Existing cached files and player progress were retained. Reconnect and retry.'); }
   }
   async function start() {
     id = document.querySelector('meta[name="ember-release"]')?.content;
     scope = document.querySelector('meta[name="ember-scope"]')?.content;
     if (!id || !scope || !('serviceWorker' in navigator) || root.Capacitor || !/^https?:/.test(location.protocol) || /[?&]nosw/.test(location.search)) return;
-    banner = document.createElement('aside'); banner.className = 'offline-status'; banner.hidden = true; banner.setAttribute('aria-label', 'Offline and updates');
+    banner = document.createElement('aside'); banner.className = 'offline-status'; banner.hidden = true; banner.setAttribute('aria-label', 'Game updates');
     message = document.createElement('span'); message.setAttribute('role', 'status');
     const button = (label, action) => { const b = document.createElement('button'); b.className = 'btn'; b.textContent = label; b.onclick = action; banner.appendChild(b); return b; };
     banner.appendChild(message); update = button('Update & reload', approve); update.hidden = true;
-    download = button('Download all artwork', downloadAll);
-    button('Repair offline files', repair);
+    button('Repair game files', repair);
     button('Save Recovery', () => ES.UI.saveRecovery()); button('Later', defer);
-    document.getElementById('app').appendChild(banner);
+    document.getElementById('settingsRoot').appendChild(banner);
     navigator.serviceWorker.addEventListener('controllerchange', () => { if (approving) finishReload(reloadTarget); else check(); });
     document.addEventListener('visibilitychange', () => { if (!document.hidden && registration) hello(); });
     try {
@@ -121,6 +126,6 @@
       await check();
     } catch (_) { show('Offline installation failed or storage is unavailable. Online play can continue; retain recovery exports.'); }
   }
-  async function reopen() { deferred = false; if (banner) banner.hidden = false; try { await registration?.update(); } catch (_) { show('Update check unavailable offline. Existing cached play is unchanged.'); } await check(); }
-  ES.Offline = { start, check: reopen, approve, defer, downloadAll, repair, get id() { return id; }, get target() { return reloadTarget; } };
+  async function reopen() { opened = true; if (banner) document.getElementById('settingsRoot').appendChild(banner); returnFocus = ES.UI.captureScreenFocus(document.activeElement); deferred = false; if (banner) banner.hidden = false; try { await registration?.update(); } catch (_) { show('Update check unavailable offline. Existing cached play is unchanged.'); } await check(); }
+  ES.Offline = { start, check: reopen, approve, defer, repair, get id() { return id; }, get target() { return reloadTarget; } };
 })(typeof window !== 'undefined' ? window : globalThis);

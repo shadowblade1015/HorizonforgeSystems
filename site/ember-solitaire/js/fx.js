@@ -8,6 +8,14 @@
 
   /* ---------- ambient ember field ------------------------------------------ */
   const field = { canvas: null, ctx: null, parts: [], cfg: null, raf: 0, last: 0, w: 0, h: 0, dpr: 1 };
+  let epoch = 0, suspended = false, parallaxReady = false;
+  function stop() {
+    epoch++; cancelAnimationFrame(field.raf); field.raf = 0;
+    if (field.canvas) { field.ctx.clearRect(0, 0, field.canvas.width, field.canvas.height); field.canvas.style.opacity = 0; }
+    px = py = 0;
+    document.documentElement.style.setProperty('--px', 0); document.documentElement.style.setProperty('--py', 0);
+  }
+  function eligible() { return motion() && !document.hidden && !suspended; }
   const PRESETS = {
     none: null,
     splash: { n: 46, area: [0, .35, 1, 1], rise: [18, 46], size: [0.7, 2.2], alpha: .9 },
@@ -43,13 +51,15 @@
     ensureCanvas();
     const cfg = PRESETS[name] || null;
     field.cfg = cfg;
-    cancelAnimationFrame(field.raf);
-    field.ctx.clearRect(0, 0, field.canvas.width, field.canvas.height);
-    if (!cfg || !motion()) { field.canvas.style.opacity = 0; return; }
+    stop();
+    if (!cfg || !eligible()) return;
+    const ticket = epoch;
     field.canvas.style.opacity = 1;
     field.parts = Array.from({ length: cfg.n }, () => { const p = {}; spawn(p, true); return p; });
     field.last = performance.now();
     const loop = now => {
+      if (ticket !== epoch) return;
+      if (!eligible()) { stop(); return; }
       const dt = Math.min(0.05, (now - field.last) / 1000); field.last = now;
       const x = field.ctx, d = field.dpr;
       x.setTransform(d, 0, 0, d, 0, 0); x.globalAlpha = 1; x.clearRect(0, 0, field.w, field.h);
@@ -67,11 +77,16 @@
     };
     field.raf = requestAnimationFrame(loop);
   }
-  document.addEventListener('visibilitychange', () => { if (document.hidden) cancelAnimationFrame(field.raf); else if (field.cfg) setField(field.name); });
+  const refresh = () => { if (field.name) setField(field.name); else stop(); };
+  if (mq.addEventListener) mq.addEventListener('change', refresh);
+  else if (mq.addListener) mq.addListener(refresh);
+  document.addEventListener('visibilitychange', refresh);
+  root.addEventListener('pagehide', () => { suspended = true; stop(); });
+  root.addEventListener('pageshow', () => { suspended = false; refresh(); });
 
   /* ---------- spark burst at a point (DOM sparks, short-lived) --------------- */
   function sparks(x, y, n, spread, opts) {
-    if (!motion()) return;
+    if (!eligible()) return;
     opts = opts || {};
     for (let i = 0; i < (n || 8); i++) {
       const s = document.createElement('i'); s.className = 'spark';
@@ -88,7 +103,8 @@
   /* ---------- pointer / tilt parallax -------------------------------------- */
   let px = 0, py = 0;
   function parallaxInit() {
-    const upd = () => { document.documentElement.style.setProperty('--px', motion() ? px.toFixed(3) : 0); document.documentElement.style.setProperty('--py', motion() ? py.toFixed(3) : 0); };
+    if (parallaxReady) return; parallaxReady = true;
+    const upd = () => { document.documentElement.style.setProperty('--px', eligible() ? px.toFixed(3) : 0); document.documentElement.style.setProperty('--py', eligible() ? py.toFixed(3) : 0); };
     root.addEventListener('pointermove', e => { if (e.pointerType !== 'mouse') return; px = (e.clientX / root.innerWidth - .5) * 2; py = (e.clientY / root.innerHeight - .5) * 2; upd(); }, { passive: true });
     root.addEventListener('deviceorientation', e => { if (e.gamma == null) return; px = Math.max(-1, Math.min(1, e.gamma / 30)); py = Math.max(-1, Math.min(1, (e.beta - 45) / 30)); upd(); }, { passive: true });
   }

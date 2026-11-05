@@ -5,7 +5,7 @@ import {extname,resolve} from 'node:path';
 import {generate} from './release.mjs';
 import {readTree,root,hash,archiveFiles} from './verify-source.mjs';
 import {chromeAudit,until} from './chrome-audit.mjs';
-const out=resolve(root,'.phase2-backup/phase3f-browser');mkdirSync(out,{recursive:true});
+const out=resolve(root,process.env.HFS_OFFLINE_EVIDENCE||'.phase2-backup/phase3f-browser');mkdirSync(out,{recursive:true});
 const source=readTree(resolve(root,'site'));
 function variant(label) {
  const input=new Map(source);
@@ -38,7 +38,7 @@ const origin='http://127.0.0.1:'+server.address().port,base=origin+'/ember-solit
 const check=(name,condition,detail)=>{checks.push({name,pass:!!condition,detail});console.log((condition?'PASS ':'FAIL ')+name);if(!condition)throw Error(name+': '+JSON.stringify(detail));};
 const rpc=(data,which='controller')=>`(async()=>{const worker=${which==='controller'?'navigator.serviceWorker.controller':which};return new Promise((resolve,reject)=>{const c=new MessageChannel(),t=setTimeout(()=>reject(Error('RPC timeout')),10000);c.port1.onmessage=e=>{clearTimeout(t);c.port1.close();resolve(e.data)};worker.postMessage(${JSON.stringify(data)},[c.port2])});})()`;
 async function boot(tab,id) {await until(()=>tab.evaluate(`window.ES?.Offline?.id===${JSON.stringify(id)}&&ES.UI?.current==='home'`),'boot '+id.slice(0,8),30000);}
-async function ready(tab,id) {await until(()=>tab.evaluate(`!!navigator.serviceWorker.controller&&${rpc({type:'STATUS'})}.then(s=>s.ok&&s.id===${JSON.stringify(id)})`),'installed core',35000);}
+async function ready(tab,id) {await until(()=>tab.evaluate(`!!navigator.serviceWorker.controller&&new URL(navigator.serviceWorker.controller.scriptURL).searchParams.get('emberProtocol')==='1'&&${rpc({type:'STATUS'})}.then(s=>s.ok&&s.id===${JSON.stringify(id)})`),'installed core',35000);}
 async function screenshot(tab,name){const r=await tab.call('Page.captureScreenshot',{format:'png'});writeFileSync(resolve(out,name+'.png'),Buffer.from(r.data,'base64'));}
 const progress=tab=>tab.evaluate('(()=>{const s=ES.Store.state,g=s.game;return {embers:s.embers,totalEmber:s.totalEmber,wins:s.stats.wins,hand:g?.settlement.handId,cols:g?.cols,stock:g?.stock,moves:g?.moves};})()');
 async function identities(tab,release,label){
@@ -46,6 +46,8 @@ async function identities(tab,release,label){
  check('actual loaded '+label+' scripts and CSS identities',details.ok&&details.engine===label&&details.css===label,details);
  const worker=await tab.evaluate(`new Promise((resolve,reject)=>{const w=new Worker(new URL('js/stuck-worker.js',document.baseURI));w.onmessage=e=>{w.terminate();resolve(e.data)};w.onerror=e=>reject(Error(e.message));w.postMessage({id:9,session:8,revision:7,cols:ES.Store.state.game.cols,stock:ES.Store.state.game.stock,completed:ES.Store.state.game.completed});})`);
  check('dedicated worker imports '+label+' engine',worker.engineRelease===label&&worker.id===9&&worker.revision===7,worker);
+ const plan=await tab.evaluate(`new Promise((resolve,reject)=>{const w=new Worker(new URL('js/stuck-worker.js',document.baseURI)),cards=ES.Engine.newDeck(1,()=>0).filter(c=>parseInt(c.id.slice(1),36)<13).sort((a,b)=>b.rank-a.rank);cards.forEach(c=>c.up=true);const cols=[cards.slice(0,12),[cards[12]],...Array.from({length:8},()=>[])];const timer=setTimeout(()=>{w.terminate();reject(Error('Offline endgame timeout'))},8000);w.onmessage=e=>{clearTimeout(timer);w.terminate();resolve(e.data)};w.onerror=e=>{clearTimeout(timer);w.terminate();reject(Error(e.message))};w.postMessage({type:'endgame',id:10,session:8,revision:7,workEpoch:6,cols,stock:[],completed:7});})`);
+ check('offline-capable endgame worker uses '+label+' immutable engine',plan.engineRelease===label&&plan.type==='endgame'&&plan.id===10&&plan.workEpoch===6&&plan.status==='solved'&&plan.plan.length===1,plan);
 }
 try {
  chrome=await chromeAudit();const browser=await chrome.send('Browser.getVersion');writeFileSync(resolve(out,'browser.json'),JSON.stringify(browser,null,2));
@@ -85,7 +87,7 @@ try {
  await a.call('Storage.overrideQuotaForOrigin',{origin,quotaSize:1});
  const quota=await a.evaluate('(async()=>{try{const c=await caches.open("hfs-quota-audit");await c.put("/quota",new Response(new Uint8Array(1048576)));return "allowed"}catch(e){return e.name}})()');
  check('real browser CacheStorage quota exhaustion reproduced',quota==='QuotaExceededError',quota);
- await a.evaluate('ES.Offline.downloadAll()');check('quota failure is visible without claiming optional success',await a.evaluate('document.querySelector(".offline-status").textContent.includes("could not")'));
+ const quotaDownload=await a.evaluate(rpc({type:'DOWNLOAD'}));check('legacy DOWNLOAD quota failure cannot acknowledge success',!quotaDownload.ok);
  await a.call('Storage.overrideQuotaForOrigin',{origin});await a.evaluate('caches.delete("hfs-quota-audit")');
  // Inject a Cache.put failure inside the actual active worker, separately labelled.
  await a.evaluate(rpc({type:'STATUS'}));const targets=await chrome.send('Target.getTargets');let attached;
@@ -94,8 +96,8 @@ try {
  }
  if(!attached)throw Error('No running B worker target');
  await chrome.send('Runtime.evaluate',{expression:'self.auditPut=Cache.prototype.put;Cache.prototype.put=function(){return Promise.reject(new DOMException("Injected write failure","QuotaExceededError"))};'},attached.sessionId);
- await a.evaluate('ES.Offline.downloadAll()');check('fault-injected worker cache-write failure is visible',await a.evaluate('document.querySelector(".offline-status").textContent.includes("could not")'));
- await chrome.send('Runtime.evaluate',{expression:'Cache.prototype.put=self.auditPut;'},attached.sessionId);await a.evaluate('ES.Offline.downloadAll()');check('optional download recovers after write failures',await a.evaluate('document.querySelector(".offline-status").textContent.includes("All artwork downloaded")'));
+ const failedDownload=await a.evaluate(rpc({type:'DOWNLOAD'}));check('legacy DOWNLOAD cache-write failure cannot acknowledge success',!failedDownload.ok);
+ await chrome.send('Runtime.evaluate',{expression:'Cache.prototype.put=self.auditPut;'},attached.sessionId);const recoveredDownload=await a.evaluate(rpc({type:'DOWNLOAD'}));check('legacy DOWNLOAD recovers after write failures',recoveredDownload.ok);
  const ownCache='ember-solitaire:'+encodeURIComponent(base)+':release-v1:'+B.release.id;
  await a.evaluate(`caches.open(${JSON.stringify(ownCache)}).then(c=>c.delete(${JSON.stringify(origin+B.release.base+'js/engine.js')}))`);network=false;
  const evicted=await a.evaluate(`fetch(${JSON.stringify(origin+B.release.base+'js/engine.js')}).then(async r=>{await r.arrayBuffer();return r.status})`);
@@ -115,6 +117,7 @@ try {
  check('legacy-controlled new HTML loads B immutable engine/CSS',await migrated.evaluate('self.__engineRelease==="B"&&getComputedStyle(document.documentElement).getPropertyValue("--audit-release").trim()==="B"'));
  await migrated.evaluate('ES.Offline.check()');check('legacy active tab blocks unsafe takeover',await migrated.evaluate('ES.Offline.approve()')===false);
  await legacyTab.close();await until(()=>migrated.evaluate(rpc({type:'STATUS'},'(await navigator.serviceWorker.getRegistration()).waiting')).then(s=>s.legacyClients===0),'legacy client fully closed');
+ check('legacy successor explicitly acquires saving and reloads latest progress',await migrated.evaluate('ES.Store.resumeEditing()'));
  await migrated.evaluate('ES.Offline.check()');await migrated.evaluate('void ES.Offline.approve();true');await ready(migrated,B.release.id);await boot(migrated,B.release.id);
  check('historical pre-3F upgrade preserves progress',JSON.stringify(await progress(migrated))===JSON.stringify(legacyProgress));check('historical recovery copies are never erased',await migrated.evaluate('localStorage.getItem("ember.save.v2.recovery.audit")')==='retain original');
  await identities(migrated,B.release,'B');

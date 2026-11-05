@@ -1,0 +1,251 @@
+{
+  "description": "Original recursive solver outcomes captured before Phase4.3 iterative traversal. Stress positions are constructed all-up stock-empty fixtures, not recorded player hands.",
+  "engineSha256": "bef37d67b22d6c670ea529fef8377e4e6dbf820519f95fd010df7b71e2ca1547",
+  "cases": [
+    {
+      "kind": "final",
+      "split": 1,
+      "limit": 1,
+      "expected": [
+        {
+          "from": 1,
+          "idx": 0,
+          "to": 0
+        }
+      ]
+    },
+    {
+      "kind": "final",
+      "split": 1,
+      "limit": 2,
+      "expected": [
+        {
+          "from": 1,
+          "idx": 0,
+          "to": 0
+        }
+      ]
+    },
+    {
+      "kind": "final",
+      "split": 1,
+      "limit": 8,
+      "expected": [
+        {
+          "from": 1,
+          "idx": 0,
+          "to": 0
+        }
+      ]
+    },
+    {
+      "kind": "final",
+      "split": 1,
+      "limit": 1000,
+      "expected": [
+        {
+          "from": 1,
+          "idx": 0,
+          "to": 0
+        }
+      ]
+    },
+    {
+      "kind": "final",
+      "split": 2,
+      "limit": 1,
+      "expected": null
+    },
+    {
+      "kind": "final",
+      "split": 2,
+      "limit": 2,
+      "expected": [
+        {
+          "from": 1,
+          "idx": 0,
+          "to": 0
+        },
+        {
+          "from": 2,
+          "idx": 0,
+          "to": 0
+        }
+      ]
+    },
+    {
+      "kind": "final",
+      "split": 2,
+      "limit": 8,
+      "expected": [
+        {
+          "from": 1,
+          "idx": 0,
+          "to": 0
+        },
+        {
+          "from": 2,
+          "idx": 0,
+          "to": 0
+        }
+      ]
+    },
+    {
+      "kind": "final",
+      "split": 2,
+      "limit": 1000,
+      "expected": [
+        {
+          "from": 1,
+          "idx": 0,
+          "to": 0
+        },
+        {
+          "from": 2,
+          "idx": 0,
+          "to": 0
+        }
+      ]
+    },
+    {
+      "kind": "final",
+      "split": 3,
+      "limit": 1,
+      "expected": null
+    },
+    {
+      "kind": "final",
+      "split": 3,
+      "limit": 2,
+      "expected": null
+    },
+    {
+      "kind": "final",
+      "split": 3,
+      "limit": 8,
+      "expected": [
+        {
+          "from": 1,
+          "idx": 0,
+          "to": 0
+        },
+        {
+          "from": 2,
+          "idx": 0,
+          "to": 0
+        },
+        {
+          "from": 3,
+          "idx": 0,
+          "to": 0
+        }
+      ]
+    },
+    {
+      "kind": "final",
+      "split": 3,
+      "limit": 1000,
+      "expected": [
+        {
+          "from": 1,
+          "idx": 0,
+          "to": 0
+        },
+        {
+          "from": 2,
+          "idx": 0,
+          "to": 0
+        },
+        {
+          "from": 3,
+          "idx": 0,
+          "to": 0
+        }
+      ]
+    },
+    {
+      "kind": "final",
+      "split": 4,
+      "limit": 1,
+      "expected": null
+    },
+    {
+      "kind": "final",
+      "split": 4,
+      "limit": 2,
+      "expected": null
+    },
+    {
+      "kind": "final",
+      "split": 4,
+      "limit": 8,
+      "expected": [
+        {
+          "from": 1,
+          "idx": 0,
+          "to": 0
+        },
+        {
+          "from": 2,
+          "idx": 0,
+          "to": 0
+        },
+        {
+          "from": 3,
+          "idx": 0,
+          "to": 0
+        },
+        {
+          "from": 4,
+          "idx": 0,
+          "to": 0
+        }
+      ]
+    },
+    {
+      "kind": "final",
+      "split": 4,
+      "limit": 1000,
+      "expected": [
+        {
+          "from": 1,
+          "idx": 0,
+          "to": 0
+        },
+        {
+          "from": 2,
+          "idx": 0,
+          "to": 0
+        },
+        {
+          "from": 3,
+          "idx": 0,
+          "to": 0
+        },
+        {
+          "from": 4,
+          "idx": 0,
+          "to": 0
+        }
+      ]
+    },
+    {
+      "kind": "stress",
+      "seed": 1,
+      "limit": 20000,
+      "expected": null
+    },
+    {
+      "kind": "stress",
+      "seed": 42,
+      "limit": 20000,
+      "expected": null
+    },
+    {
+      "kind": "stress",
+      "seed": 100,
+      "limit": 20000,
+      "expected": null
+    }
+  ]
+}

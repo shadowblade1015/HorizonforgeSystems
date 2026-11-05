@@ -60,6 +60,16 @@ test('multiple identified release clients pin A through B takeover and A retires
 test('waiting release is retained by active-worker retirement and rollback reuse does not overwrite a live cache',async()=>{const a=worker();a.live.push({id:'a',url:scope});await a.run('install');await a.run('message',{data:{type:'HELLO',id:a.release.id},source:a.live[0]});const b=worker(fixture('b'),a.storage);b.live.push(...a.live);await b.run('install');await a.t.retire();assert.ok(await b.t.cacheRelease(b.release.id));a.state.network='throw';await a.run('install');assert.ok(await a.t.cacheRelease(a.release.id));});
 test('unknown clients prevent cleanup and a fifth retained release is refused, bounding cache growth',async()=>{const w=worker(fixture('e'));w.live.push({id:'unknown',url:scope});for(const c of ['a','b','c','d'])await w.storage.open(w.t.PREFIX+c.repeat(64));await assert.rejects(w.run('install'),/Close old/);assert.equal((await w.storage.keys()).filter(n=>/[a-f0-9]{64}$/.test(n)).length,4);});
 test('a failed upgrade with no open tabs preserves the previous active offline release',async()=>{const a=worker();await a.run('install');await a.run('activate');const b=worker(fixture('b'),a.storage);b.state.network='throw';await assert.rejects(b.run('install'));assert.ok(await a.t.cacheRelease(a.release.id));assert.equal(await b.t.cacheRelease(b.release.id),null);});
+test('retirement cannot delete a candidate created after its keep metadata snapshot',async()=>{
+ const a=worker();await a.run('install');await a.run('activate');const original=a.storage.open.bind(a.storage),candidate=a.t.PREFIX+'b'.repeat(64);let interleaved=false;
+ a.storage.open=async name=>{const c=await original(name);if(name!==a.t.META)return c;return {...c,async match(url){const r=await c.match(url);if(url===a.t.pendingURL&&!interleaved){interleaved=true;await c.put(a.t.pendingURL,new Response('b'.repeat(64)));await original(candidate);}return r;}};};
+ await a.t.retire();assert.equal(interleaved,true);assert.ok((await a.storage.keys()).includes(candidate));assert.ok(await a.t.cacheRelease(a.release.id));
+});
+test('install publishes its pending protection before the candidate cache becomes visible',async()=>{
+ const w=worker(),original=w.storage.open.bind(w.storage);let checked=false;
+ w.storage.open=async name=>{if(name===w.t.CACHE){const meta=await original(w.t.META),pending=await meta.match(w.t.pendingURL);assert.equal(await pending?.text(),w.release.id);checked=true;}return original(name);};
+ await w.run('install');assert.equal(checked,true);assert.ok(await w.t.cacheRelease(w.release.id));
+});
 test('CacheStorage read denial still permits hash-verified online resources without pretending they are stored',async()=>{const w=worker();await w.run('install');w.storage.state.openFail=true;const r=await w.run('fetch',{request:{url:new URL(w.release.base+'js/engine.js',scope).href,method:'GET'}});assert.equal(r.response.status,200);assert.match(await r.response.text(),/engine/);});
 test('explicit repair restores partial and complete core eviction without deleting valid unrelated content',async()=>{const w=worker();await w.run('install');await(await w.storage.open(w.t.CACHE)).delete(new URL(w.release.base+'js/engine.js',scope).href);assert.equal((await w.run('message',{data:{type:'STATUS'}})).reply.ok,false);assert.equal((await w.run('message',{data:{type:'REPAIR'}})).reply.ok,true);assert.equal((await w.run('message',{data:{type:'STATUS'}})).reply.ok,true);await w.storage.delete(w.t.CACHE);assert.equal((await w.run('message',{data:{type:'REPAIR'}})).reply.ok,true);assert.equal((await w.run('message',{data:{type:'STATUS'}})).reply.ok,true);});
 test('non-game source changes leave the game release ID unchanged and input insertion order is irrelevant',()=>{const source=readTree(root+'site'),a=generate(source),b=new Map([...source].reverse());b.set('about/audit.txt',Buffer.from('fixture'));assert.equal(generate(b).release.id,a.release.id);});
@@ -72,11 +82,62 @@ function client({legacy=false,bridge=false}={}) {
  h.context.navigator={serviceWorker:{controller:active,async register(){return reg;},addEventListener:(n,f)=>listeners.set(n,f)}};
  h.context.URL=URL;h.context.MessageChannel=Channel;h.context.location={protocol:'https:',origin:'https://test.invalid',search:'',reload(){reloads++;}};
  h.get('meta[name="ember-release"]').content=bridge?b:a;h.get('meta[name="ember-scope"]').content='/ember-solitaire/';h.load('offline');
- return {...h,api:h.context.ES.Offline,calls,reg,async takeover(){reg.waiting=null;h.context.navigator.serviceWorker.controller=waiting;listeners.get('controllerchange')();for(let i=0;i<20;i++)await Promise.resolve();},get reloads(){return reloads;}};
+ return {...h,active,api:h.context.ES.Offline,calls,reg,async takeover(){reg.waiting=null;h.context.navigator.serviceWorker.controller=waiting;listeners.get('controllerchange')();for(let i=0;i<20;i++)await Promise.resolve();},get reloads(){return reloads;}};
 }
+
+function capabilityClient({core=true,artwork=false,download=true,repair=true,wrong=false,silent=false}={}) {
+ const h=client();h.reg.waiting=null;let complete=artwork;
+ h.active.postMessage=(data,ports)=>{
+  h.calls.push(data);let reply={ok:true};
+  if(data.type==='STATUS'){if(silent)return;reply={ok:core,artworkOk:complete,id:(wrong?'b':'a').repeat(64)};}
+  if(data.type==='DOWNLOAD'){reply={ok:download};if(download)complete=true;}
+  if(data.type==='REPAIR'){reply={ok:repair};if(repair)core=true;}
+  ports?.[0]?.postMessage(reply);
+ };
+ return {...h,message:()=>h.document.querySelector('.offline-status').children[0].textContent};
+}
+test('STATUS separates core launch capability from optional artwork availability',async()=>{
+ const w=worker();await w.run('install');let s=(await w.run('message',{data:{type:'STATUS'}})).reply;
+ assert.equal(s.ok,true);assert.equal(s.artworkOk,false);
+ await w.run('message',{data:{type:'DOWNLOAD'}});s=(await w.run('message',{data:{type:'STATUS'}})).reply;assert.equal(s.artworkOk,true);
+ await(await w.storage.open(w.t.CACHE)).delete(new URL(w.release.base+'js/engine.js',scope).href);
+ s=(await w.run('message',{data:{type:'STATUS'}})).reply;assert.equal(s.ok,false);assert.equal(s.artworkOk,true);
+});
+for(const core of [true,false])for(const artwork of [true,false])test(`Settings-only update status core=${core} artwork=${artwork} makes no offline promise`,async()=>{
+ const h=capabilityClient({core,artwork});await h.api.start();
+ const panel=h.document.querySelector('.offline-status');assert.equal(panel.hidden,true);
+ assert.equal(h.api.downloadAll,undefined);assert.equal(panel.children.some(b=>/Download/i.test(b.textContent)),false);
+ assert.doesNotMatch(h.message(),/all supported modes|available offline|Download/);
+ await h.api.check();assert.equal(panel.hidden,false);assert.match(h.message(),core?/verified/:/unavailable/);
+});
+for(const repair of [true,false])test(`repair success=${repair} verifies current legacy files`,async()=>{
+ const h=capabilityClient({core:false,repair});await h.api.start();await h.api.repair();assert.match(h.message(),repair?/verified/:/could not complete/);
+});
+test('successful REPAIR still requires fresh STATUS',async()=>{
+ const h=capabilityClient({core:false}),original=h.active.postMessage;
+ h.active.postMessage=(d,p)=>d.type==='REPAIR'?p[0].postMessage({ok:true}):original(d,p);
+ await h.api.start();await h.api.repair();assert.match(h.message(),/unavailable/);
+});
+test('wrong-release STATUS refuses repair',async()=>{
+ const h=capabilityClient({wrong:true});await h.api.start();await h.api.repair();assert.equal(h.calls.some(c=>c.type==='REPAIR'),false);
+});
+test('STATUS timeout never invents verified files',async()=>{
+ const h=capabilityClient();await h.api.start();h.active.postMessage=()=>{};
+ const pending=h.api.repair();h.clock.advance(12001);await pending;assert.match(h.message(),/could not complete/);
+});
+test('registration failure leaves game and recovery usable',async()=>{
+ const h=client();h.context.navigator.serviceWorker.register=async()=>{throw Error('Denied')};await h.api.start();
+ assert.equal(h.document.querySelector('.offline-status').hidden,true);assert.equal(h.S.canEdit,true);assert.equal(h.S.save(true),true);assert.equal(h.reloads,0);
+});
+test('Later integrates with shared focus restoration and retains polite status semantics',async()=>{
+ const h=capabilityClient();await h.api.start();const invoker=new h.Element('button');h.get('#scr-game').appendChild(invoker);invoker.focus();await h.api.check();
+ const banner=h.document.querySelector('.offline-status'),later=banner.children.find(b=>b.textContent==='Later');banner.contains=node=>banner.children.includes(node);
+ assert.equal(banner.children[0].getAttribute('role'),'status');later.focus();h.api.defer();assert.equal(banner.hidden,true);assert.equal(h.document.activeElement,invoker);assert.equal(h.reloads,0);assert.equal(h.calls.some(c=>c.type==='ACTIVATE'),false);
+});
 test('update deferral never reloads or activates; approval flushes save and holds input until own takeover',async()=>{const h=client();await h.api.start();assert.equal(h.api.target,'b'.repeat(64));h.api.defer();assert.equal(h.reloads,0);assert.equal(h.calls.some(c=>c.type==='ACTIVATE'),false);await h.api.approve();assert.equal(h.S.persistence.unsaved,false);assert.equal(h.debug.holds.size,1);await h.takeover();assert.equal(h.reloads,1);});
 test('failed save blocks activation/reload and releases the update hold',async()=>{const h=client();await h.api.start();assert.equal(h.api.target,'b'.repeat(64));h.context.localStorage.setItem=()=>{throw Error('Write denied');};assert.equal(await h.api.approve(),false);assert.equal(h.reloads,0);assert.equal(h.calls.some(c=>c.type==='ACTIVATE'),false);assert.equal(h.debug.holds.size,0);});
 test('another tab activating a worker never automatically reloads this tab',async()=>{const h=client();await h.api.start();await h.takeover();assert.equal(h.reloads,0);});
+test('read-only tab cannot approve an update or claim pending ownership as a durable save',async()=>{const h=client();await h.api.start();const raw=h.storage.get(h.S.KEY);h.S.releaseWriter();h.context.navigator.locks={request(){return new Promise(()=>{})}};h.S.acquireWriter();assert.equal(await h.api.approve(),false);assert.equal(h.reloads,0);assert.equal(h.calls.some(c=>c.type==='ACTIVATE'),false);assert.equal(h.debug.holds.size,0);assert.equal(h.storage.get(h.S.KEY),raw);assert.notEqual(h.S.persistence.code,'saved');});
 test('future schema protection blocks approval without replacing the original saved value',async()=>{const h=client(),raw='{"v":999,"embers":1234}';h.storage.set(h.S.KEY,raw);h.S.load();await h.api.start();assert.equal(await h.api.approve(),false);assert.equal(h.reloads,0);assert.equal(h.storage.get(h.S.KEY),raw);assert.equal(h.debug.holds.size,0);});
 test('legacy-client refusal keeps this tab running and releases its update hold',async()=>{const h=client({legacy:true});await h.api.start();assert.equal(await h.api.approve(),false);assert.equal(h.reloads,0);assert.equal(h.debug.holds.size,0);});
 test('a verified legacy bridge reloads only its already-loaded waiting bundle, without unsupported legacy RPC',async()=>{const h=client({bridge:true});h.reg.active.scriptURL=scope+'sw.js';h.reg.active.postMessage=()=>{throw Error('Legacy worker cannot reply');};await h.api.start();assert.equal(h.api.target,'b'.repeat(64));assert.equal(await h.api.approve(),true);assert.equal(h.S.persistence.unsaved,false);assert.equal(h.reloads,1);await h.takeover();assert.equal(h.reloads,1);});

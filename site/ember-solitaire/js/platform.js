@@ -26,21 +26,68 @@
   }
 
   /* ---------- storage: Preferences survives WebView data eviction ---------- */
-  async function hydrate(key) {
-    if (!native) return;
-    const r = await call('Preferences', 'get', { key });
-    try {
-      const local = root.localStorage.getItem(key);
-      if (r && r.value) {
-        // prefer whichever save is newer
-        const a = JSON.parse(r.value), b = local ? JSON.parse(local) : null;
-        if (!b || (a.savedAt || 0) >= (b.savedAt || 0)) root.localStorage.setItem(key, r.value);
-      } else if (local) {
-        await call('Preferences', 'set', { key, value: local });      // first run after migration
-      }
-    } catch (e) { /* corrupted local copy: Preferences wins */ if (r && r.value) try { root.localStorage.setItem(key, r.value); } catch (e2) {} }
+  // The Store owns profile validation and writer authority. Preferences is an
+  // ordered acknowledged mirror, never a timestamp-based profile selector.
+  let writes = Promise.resolve(true), hydrated = false, expectedNative = null;
+  async function required(method, args) {
+    const p = plugin('Preferences');
+    if (!p || typeof p[method] !== 'function') throw Error('Native Preferences unavailable');
+    return p[method](args);
   }
-  function persist(key, value) { if (native) call('Preferences', 'set', { key, value }); }
+  async function hydrate(key) {
+    if (!native || !ES.Store?.ownsWriter) return false;
+    try {
+      const r = await required('get', { key });
+      expectedNative = r?.value ?? null;
+      // Restore raw companions as recovery copies, never merge player profiles.
+      const keys = await required('keys');
+      for (const copyKey of keys.keys || []) if (copyKey.startsWith(key + '.')) {
+        const raw = (await required('get', { key: copyKey }))?.value;
+        if (raw == null) continue;
+        const existing = root.localStorage.getItem(copyKey);
+        if (existing === raw) continue;
+        const destination = existing === null ? copyKey : key + '.recovery.native.' + Date.now() + '.' + Math.random().toString(16).slice(2);
+        root.localStorage.setItem(destination, raw);
+        if (root.localStorage.getItem(destination) !== raw) throw Error('Native recovery copy could not be preserved');
+      }
+      const local = root.localStorage.getItem(key);
+      if (expectedNative !== null) ES.Store.inspectImport(expectedNative);
+      if (expectedNative !== null && local !== null && expectedNative !== local) throw Error('Native and browser saves differ; review whole recovery copies');
+      if (expectedNative !== null && local === null && !ES.Store.restoreNative(expectedNative)) throw Error('Native save cannot be restored safely');
+      hydrated = true;
+      if (expectedNative === null && local !== null) return await persist(key, local);
+      return true;
+    } catch (e) { ES.Store.nativeFailure(expectedNative, e.message); return false; }
+  }
+  function persist(key, value, copies = {}) {
+    if (!native) return Promise.resolve(true);
+    writes = writes.then(async () => {
+      try {
+        if (!hydrated || !ES.Store.ownsWriter) throw Error('Native save has no validated owner');
+        ES.Store.inspectImport(value);
+        const current = (await required('get', { key }))?.value ?? null;
+        if (current !== expectedNative) { ES.Store.nativeFailure(current, 'Native save changed; original protected'); return false; }
+        // Preserve backup and recovery values before committing the primary.
+        // A failed companion write leaves the prior native primary intact.
+        for (const [copyKey, raw] of Object.entries(copies)) {
+          if (!copyKey.startsWith(key + '.')) throw Error('Invalid game recovery key');
+          const old = (await required('get', { key: copyKey }))?.value ?? null;
+          if (old !== null && old !== raw) {
+            const recovery = key + '.recovery.native.' + Date.now() + '.' + Math.random().toString(16).slice(2);
+            await required('set', { key: recovery, value: old });
+          }
+          await required('set', { key: copyKey, value: raw });
+        }
+        if (!ES.Store.ownsWriter) throw Error('Native writer ownership was released');
+        await required('set', { key, value });
+        if ((await required('get', { key }))?.value !== value) throw Error('Native write could not be verified');
+        expectedNative = value;
+        return true;
+      } catch (e) { ES.Store.nativeFailure(null, e.message); return false; }
+    });
+    return writes;
+  }
+  function flush() { return writes; }
 
   /* ---------- haptics ------------------------------------------------------ */
   function haptic(pattern) {
@@ -66,15 +113,18 @@
     if (cur === 'home' || cur === 'splash' || cur === 'intro') { call('App', 'minimizeApp'); return; }
     ES.UI.back('home');
   }
+  let initialized = false;
   async function init() {
-    if (!native) return;
+    if (!native || initialized) return;
+    initialized = true;
     document.documentElement.classList.add('is-native');
     const App = plugin('App');
     if (App) {
-      App.addListener('backButton', onBack);
-      App.addListener('appStateChange', ({ isActive }) => {
-        if (!isActive) { if (ES.Board) ES.Board.setAppActive(false); ES.Store.save(true); ES.Analytics.flushSession(); }
-        else { ES.Board && ES.Board.setAppActive(true); ES.Ads && ES.Ads.onResume(); }
+      const listen = (name, fn) => { try { Promise.resolve(App.addListener(name, fn)).catch(e => ES.Analytics?.nonFatal(e, 'App.' + name)); } catch (e) { ES.Analytics?.nonFatal(e, 'App.' + name); } };
+      listen('backButton', onBack);
+      listen('appStateChange', ({ isActive }) => {
+        if (!isActive) { if (ES.Board) ES.Board.setAppActive(false); void ES.Store.flushSave(); ES.Audio?.suspend(true); ES.Analytics.flushSession(); }
+        else { ES.Board && ES.Board.setAppActive(true); ES.Audio?.suspend(false); ES.Ads && ES.Ads.onResume(); }
       });
     }
     call('StatusBar', 'setStyle', { style: 'DARK' });
@@ -89,5 +139,5 @@
     try { root.open(url, '_blank'); } catch (e) { location.href = url; }
   }
 
-  ES.Platform = { native, plugin, call, hydrate, persist, haptic, init, minimize, openUrl, onBack };
+  ES.Platform = { native, plugin, call, hydrate, persist, flush, haptic, init, minimize, openUrl, onBack };
 })(typeof window !== 'undefined' ? window : globalThis);

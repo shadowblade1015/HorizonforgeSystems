@@ -100,13 +100,13 @@ test('auto-complete executes each legal planned move once and pays once',async()
 for(const operation of ['undo','replacement','navigation'])test(`old worker replies/errors after ${operation} cannot show a stuck dialog`,()=>{
   const h=lifecycleHarness({stuck:true}),g=h.start(finalHand(h.E,2));h.clock.advance(700);const worker=h.workers.at(-1);assert.ok(worker);const request=worker.requests[0],reply=worker.onmessage,error=worker.onerror;let prompts=0;h.B.onStuck=()=>prompts++;
   if(operation==='undo'){h.B.doMove(1,0,0);h.B.doUndo();}if(operation==='replacement')h.start();if(operation==='navigation')h.UI.go('home');
-  reply({data:{...request,stuck:true}});error();assert.equal(prompts,0);assert.equal(worker.terminated,true);assert.equal(h.debug.pendingMap.size,0);
+  reply({data:{...request,status:'checked',stuck:true}});error();assert.equal(prompts,0);assert.equal(worker.terminated,true);assert.equal(h.debug.pendingMap.size,0);
 });
 
 test('one current worker request is bounded and a matching current result is delivered exactly once',()=>{
   const h=lifecycleHarness({stuck:true});h.start(finalHand(h.E,2));h.clock.advance(700);const worker=h.workers.at(-1),request=worker.requests[0];let prompts=0;h.B.onStuck=()=>prompts++;
   for(let i=0;i<10;i++)h.debug.endgameChecks();assert.equal(worker.requests.length,1);assert.equal(h.debug.pendingMap.size,1);
-  worker.onmessage({data:{...request,stuck:true}});worker.onmessage({data:{...request,stuck:true}});assert.equal(prompts,1);assert.equal(h.debug.pendingMap.size,0);
+  worker.onmessage({data:{...request,status:'checked',stuck:true}});worker.onmessage({data:{...request,status:'checked',stuck:true}});assert.equal(prompts,1);assert.equal(h.debug.pendingMap.size,0);
 });
 
 test('repeated victory scheduling has only one current presentation callback',()=>{
@@ -156,11 +156,12 @@ test('sheet close is idempotent, releases one hold and cancels delayed focus',()
   assert.equal(first.focuses,0);
 });
 
-test('worker error falls back only for a current pending request and never repeats a delivered prompt',()=>{
+test('worker failure never falls back to main-thread search or repeats a delivered prompt',()=>{
   const h=lifecycleHarness({stuck:true});h.start(finalHand(h.E,2));h.clock.advance(700);let prompts=0;h.B.onStuck=()=>prompts++;h.E.isStuck=()=>true;
-  const worker=h.workers.at(-1);worker.onerror();h.clock.advance(0);assert.equal(prompts,1);assert.equal(h.debug.pendingMap.size,0);assert.equal(worker.terminated,true);
+  h.E.isStuck=()=>{throw Error('Main-thread fallback is forbidden');};
+  const worker=h.workers.at(-1);worker.onerror();h.clock.advance(0);assert.equal(prompts,0);assert.equal(h.debug.pendingMap.size,0);assert.equal(worker.terminated,true);assert.equal(h.B.searchStatus.state,'unavailable');
   const other=lifecycleHarness({stuck:true});other.start(finalHand(other.E,2));other.clock.advance(700);let count=0;other.B.onStuck=()=>count++;other.E.isStuck=()=>true;
-  const w=other.workers.at(-1),request=w.requests[0];w.onmessage({data:{...request,stuck:true}});w.onerror();other.clock.advance(0);assert.equal(count,1);
+  const w=other.workers.at(-1),request=w.requests[0];w.onmessage({data:{...request,status:'checked',stuck:true}});w.onerror();other.clock.advance(0);assert.equal(count,1);
 });
 
 test('a resize/render supersedes animation callbacks even without a position mutation',()=>{

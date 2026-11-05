@@ -189,3 +189,18 @@
 .run-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; width: 100%; }
 .run-controls[hidden] { display: none; }
 .run-controls > span { flex-basis: 100%; }
+
+/* Outside outlines preserve corner ranks, suit symbols and artwork. */
+.card.hint-src { outline: 2.4px solid #ffcf85; outline-offset: 1px; box-shadow: 0 0 22px rgba(255,150,60,.9), var(--card-shadow); }
+.col-hl.hint-dst { outline: 3px dashed #fff0c8; outline-offset: 3px; box-shadow: 0 0 29px #ff8c32; }
+@keyframes hintPulse { 50% { box-shadow: 0 0 0 2.4px #ffcf85, 0 0 22px rgba(255,150,60,.95), var(--card-shadow); } }
+@keyframes hintPulse2 { 0%,100% { box-shadow: 0 0 12px rgba(255,140,50,.8); } 50% { box-shadow: 0 0 29px #ff8c32; } }
+:root[data-reduced="1"] .hint-src, :root[data-reduced="1"] .hint-dst { animation: none !important; }
+@media (prefers-reduced-motion: reduce) { .hint-src, .hint-dst { animation: none !important; } }
+:root[data-contrast="1"] .card.hint-src { outline-color: #fff; box-shadow: 0 0 0 4px #000, 0 0 22px #ff8c32; }
+:root[data-contrast="1"] .col-hl.hint-dst { outline-color: #fff; box-shadow: 0 0 0 6px #000; }
+
+/* A dashed right edge marks a mixed-suit join without covering the face. */
+.card.suit-break:not(.down) { border-right: 2px dashed var(--molten-gold); }
+
+.toast.hint { width: max-content; max-width: calc(100vw - 32px); white-space: normal; text-align: center; }

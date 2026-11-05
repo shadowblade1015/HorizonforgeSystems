@@ -1,0 +1,36 @@
+{
+  "checks": [
+    {
+      "name": "source and destination 1280",
+      "pass": true
+    },
+    {
+      "name": "static outline 1280",
+      "pass": true
+    },
+    {
+      "name": "hint visible after 2200ms 1280",
+      "pass": true
+    },
+    {
+      "name": "hint cleared after 2600ms 1280",
+      "pass": true
+    },
+    {
+      "name": "source and destination 390",
+      "pass": true
+    },
+    {
+      "name": "static outline 390",
+      "pass": true
+    },
+    {
+      "name": "hint visible after 2200ms 390",
+      "pass": true
+    },
+    {
+      "name": "hint cleared after 2600ms 390",
+      "pass": true
+    }
+  ]
+}

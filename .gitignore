@@ -5,14 +5,3 @@
 /.phase2-backup/
 /baseline-verification.tmp.json
 /phase2-verification.tmp.json
-
-/node_modules/
-/www/
-/android/.gradle/
-/android/local.properties
-/android/**/build/
-/ios/App/Pods/
-/ios/App/App/public/
-/ios/App/App/capacitor.config.json
-/ios/App/CapApp-SPM/.build/
-/.native-backup-*/

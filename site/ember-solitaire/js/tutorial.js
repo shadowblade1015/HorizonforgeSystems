@@ -87,7 +87,6 @@
     }
   }
   function start() {
-    if (!St().canEdit) { UI.saveRecovery(); return; }
     cancelCoach();
     const g = tutorialDeal(); g.run = 0; g.tutorial = true;
     g.initial = JSON.parse(JSON.stringify({ cols: g.cols, stock: g.stock }));
@@ -125,7 +124,7 @@
       ES.Board.stockHighlight(true);
       coach(`<b>Out of moves? Deal from the stock.</b><span>One card lands on every column. Each column must hold a card first.</span>`, `<button class="btn" data-t="goal">Next</button>`);
     } else if (name === 'goal') {
-      coach(`<b>Build King down to Ace in one suit.</b><span>Place cards one rank lower, even across suits. Only descending cards of one suit move together. All 13 cards from K to A must share one suit to forge a set; matching color is not enough. Forge all eight to win — and feed the flame.</span>`, `<button class="btn btn-primary" data-t="done">Got it</button>`);
+      coach(`<b>Build King down to Ace in one suit.</b><span>A finished run is forged into a set. Forge all eight to win — and feed the flame.</span>`, `<button class="btn btn-primary" data-t="done">Got it</button>`);
     } else if (name === 'done') end();
   }
   function end(skipped) {

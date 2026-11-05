@@ -205,97 +205,10 @@
 
   let S = fresh(), saveT = null, originalRaw = null, lastGoodRaw = null;
   let blocked = true, recoverable = false, recoveryKey = null;
-  // One cooperative writer per storage origin/profile, held across synchronous
-  // saves. No expiring localStorage lease or read/then/write is used as a lock.
-  const WRITER_LOCK = KEY + '.writer.v1';
-  let writer = false, conflict = false, loaded = false, expectedRaw = null, expectedBackup = null;
-  let ownership = 'uninitialized', acquireTask = null, releaseLock = null, generation = 0;
-  let conflictMemory = null, conflictStored = null, releaseRequested = false;
-  function editable() { return writer && loaded && !conflict && !releaseRequested; }
-  function readOnlyStatus() {
-    const unsupported = ownership === 'unsupported';
-    status(unsupported ? 'unsupported' : conflict ? 'conflict' : 'readonly', unsupported
-      ? 'Read-only: this browser cannot provide safe save ownership. Use a supported secure browser. Export remains available.'
-      : conflict ? 'Save conflict: newer or different stored progress is protected. Export this tab, then reload latest progress to resume editing.'
-      : 'Read-only: another tab may own saving. Close that tab, then use Resume editing to reload the latest progress. Export remains available.');
-  }
-  function acquireWriter() {
-    if (writer) return Promise.resolve(!releaseRequested);
-    if (acquireTask) return acquireTask;
-    const locks = root.navigator && root.navigator.locks;
-    if (!locks || typeof locks.request !== 'function') { ownership = 'unsupported'; readOnlyStatus(); return Promise.resolve(false); }
-    const ticket = ++generation;
-    ownership = 'acquiring';
-    let finish;
-    const result = new Promise(resolve => { finish = resolve; });
-    acquireTask = result;
-    let done = false;
-    const complete = value => { if (done) return; done = true; clearTimeout(timer); if (ticket === generation) acquireTask = null; finish(value); };
-    const timer = setTimeout(() => { if (ticket === generation && !writer) { generation++; acquireTask = null; ownership = 'readonly'; readOnlyStatus(); } complete(false); }, 2000);
-    try {
-      Promise.resolve(locks.request(WRITER_LOCK, { mode: 'exclusive', ifAvailable: true }, lock => {
-        // A late callback after timeout/release must not turn into a hidden owner.
-        if (ticket !== generation || done) return;
-        if (!lock) { ownership = 'readonly'; readOnlyStatus(); complete(false); return; }
-        writer = true; releaseRequested = false; loaded = false; ownership = 'writer';
-        const held = new Promise(resolve => { releaseLock = resolve; });
-        complete(true);
-        emit({ type: 'ownership' });
-        return held;
-      })).catch(() => {
-        if (ticket === generation) { writer = false; releaseLock = null; ownership = 'unsupported'; readOnlyStatus(); }
-        complete(false);
-      });
-    } catch (_) { ownership = 'unsupported'; readOnlyStatus(); complete(false); }
-    return result;
-  }
-  function releaseWriter() {
-    if (ES.Platform?.native && writer) {
-      if (releaseRequested) return;
-      releaseRequested = true; clearTimeout(saveT); ownership = 'releasing'; readOnlyStatus();
-      // A bridge write already accepted by the OS cannot be cancelled by JS.
-      // Hold the actual Web Lock until the complete queue settles, while
-      // refusing new edits/acquisition in this context.
-      Promise.resolve(ES.Platform.flush()).then(releaseWriterNow, releaseWriterNow);
-      return;
-    }
-    releaseWriterNow();
-  }
-  function releaseWriterNow() {
-    releaseRequested = false;
-    generation++; clearTimeout(saveT); acquireTask = null;
-    writer = false; ownership = 'released';
-    if (releaseLock) releaseLock(); releaseLock = null;
-    readOnlyStatus(); emit({ type: 'ownership' });
-  }
-  async function resumeEditing() {
-    if (!await acquireWriter()) return false;
-    // Explicit UI confirmation is required before discarding this tab's memory.
-    try { quarantine(JSON.stringify(snapshot())); } catch (_) { releaseWriter(); status('unsaved', 'Could not preserve this tab. Export before reloading latest progress.'); return false; }
-    load();
-    return editable() && !blocked;
-  }
-  function protectConflict(raw) {
-    conflict = true; clearTimeout(saveT); ownership = 'conflict';
-    try { conflictMemory = JSON.stringify(snapshot()); } catch (_) { /* memory remains exportable when valid */ }
-    conflictStored = raw;
-    // These are new, unique recovery keys, never primary/backup replacements.
-    for (const value of [raw, conflictMemory]) try { quarantine(value); } catch (_) { /* leave authoritative raw untouched */ }
-    readOnlyStatus();
-  }
-  function canReplace() {
-    if (!editable() || !loaded) { readOnlyStatus(); return false; }
-    try {
-      const store = storage(), raw = store.getItem(KEY), backup = store.getItem(BACKUP_KEY);
-      if (raw !== expectedRaw || backup !== expectedBackup) { protectConflict(raw); return false; }
-      return true;
-    } catch (_) { status('unsaved', 'Stored progress could not be checked. No save was replaced. Retry or export before leaving.'); return false; }
-  }
   const listeners = new Set();
   let persistence = { code: 'ready', unsaved: false, message: '', blocked: false };
   function status(code, message, unsaved = true) {
-    if (!editable() && (code === 'saved' || code === 'ready' || code === 'pending')) { code = 'readonly'; message = 'Read-only: close the saving tab, then Resume editing to reload current progress. Export remains available.'; unsaved = true; }
-    persistence = { code, message, unsaved, blocked: blocked || !editable(), recoveryKey, ownership, writer: editable() };
+    persistence = { code, message, unsaved, blocked, recoveryKey };
     emit({ type: 'persistence', status: Object.assign({}, persistence) });
   }
   function storage() {
@@ -306,8 +219,8 @@
   function quarantine(raw) {
     if (raw === null) return null;
     const store = storage();
-    let key;
-    do { key = RECOVERY_PREFIX + Date.now() + '.' + newHandId(); } while (store.getItem(key) !== null);
+    let suffix = 0, key;
+    do { key = RECOVERY_PREFIX + Date.now() + '.' + suffix++; } while (store.getItem(key) !== null);
     store.setItem(key, raw);
     if (store.getItem(key) !== raw) throw Error('Recovery copy could not be verified');
     return key;
@@ -315,12 +228,9 @@
   function load() {
     clearTimeout(saveT);
     emit({ type: 'beforeGameChange' });
-    S = fresh(); blocked = true; recoverable = false; recoveryKey = null; originalRaw = null; lastGoodRaw = null; loaded = false;
-    conflict = false; conflictMemory = conflictStored = null;
-    if (writer) ownership = 'writer';
+    S = fresh(); blocked = true; recoverable = false; recoveryKey = null; originalRaw = null; lastGoodRaw = null;
     try {
       originalRaw = storage().getItem(KEY);
-      expectedRaw = originalRaw; expectedBackup = storage().getItem(BACKUP_KEY); loaded = true;
       if (originalRaw === null) { blocked = false; status('ready', '', false); }
       else {
         let checked;
@@ -343,7 +253,6 @@
     } catch (e) { status('unavailable', 'Saved progress cannot be read. Saving is blocked to protect it. Export this session before leaving.'); }
     prepareHand(S.game);
     ensureProgress(S.artifact);
-    if (!writer) readOnlyStatus();
     return S;
   }
   function snapshot() {
@@ -352,49 +261,24 @@
     if (S.game) copy.game = Object.assign({}, S.game, { history: S.game.history.slice(-20) });
     return copy;
   }
-  let mirrorRevision = 0;
-  function nativeFailure(raw, message) {
-    if (raw !== null) try { quarantine(raw); } catch (_) { /* Original native raw remains untouched. */ }
-    status('unsaved', 'Native storage: ' + message + '. Local progress retained; export Save Recovery before leaving.');
-  }
-  function mirrorNative(json) {
-    if (!ES.Platform?.native) return;
-    const revision = ++mirrorRevision, copies = {};
-    try {
-      const store = storage();
-      for (let i = 0; i < store.length; i++) { const key = store.key(i); if (key === BACKUP_KEY || key?.startsWith(RECOVERY_PREFIX)) copies[key] = store.getItem(key); }
-      status('pending', 'Saving native progress…');
-      Promise.resolve(ES.Platform.persist(KEY, json, copies)).then(ok => {
-        if (revision !== mirrorRevision || expectedRaw !== json || blocked || !editable()) return;
-        if (ok) status('saved', '', false); else nativeFailure(null, 'Write not acknowledged');
-      }, () => nativeFailure(null, 'Write failed'));
-    } catch (_) { nativeFailure(null, 'Write failed'); }
-  }
-  async function flushSave() {
-    if (!save(true)) return false;
-    if (ES.Platform?.native) await ES.Platform.flush();
-    return !persistence.unsaved && !persistence.blocked;
-  }
   function writeProfile(profile) {
-    if (!canReplace()) return false;
     const checked = validateProfile(profile);
     if (checked.issues.length) throw Error('Current progress failed validation: ' + checked.issues.join(', '));
     const json = JSON.stringify(profile), store = storage();
     // Fail closed if the prior valid save cannot be backed up. Never clear data
     // to free quota, and never mark a failed write as saved.
-    if (lastGoodRaw !== null) { store.setItem(BACKUP_KEY, lastGoodRaw); expectedBackup = lastGoodRaw; }
+    if (lastGoodRaw !== null) store.setItem(BACKUP_KEY, lastGoodRaw);
     store.setItem(KEY, json);
-    expectedRaw = json;
     lastGoodRaw = json;
     S.savedAt = profile.savedAt;
     status('saved', '', false);
-    mirrorNative(json);
+    // Optional native mirror is not the web durability acknowledgement.
+    try { if (ES.Platform) ES.Platform.persist(KEY, json); } catch (e) { /* local write succeeded */ }
     return true;
   }
   function save(now) {
-    if (victoryInProgress) return false; // No durable acknowledgement until complete settlement.
+    if (victoryInProgress) return true; // The complete settlement is flushed together.
     clearTimeout(saveT);
-    if (!canReplace()) return false;
     if (blocked) { status(persistence.code, persistence.message); return false; }
     const run = () => {
       try { return writeProfile(snapshot()); }
@@ -407,17 +291,14 @@
   }
   function acceptRecovery() {
     if (!recoverable || originalRaw === null) return false;
-    if (!canReplace()) return false;
     try {
       if (!recoveryKey) recoveryKey = quarantine(originalRaw);
       const profile = snapshot(), checked = validateProfile(profile);
       if (checked.issues.length) throw Error('Recovery is invalid');
       const store = storage(), json = JSON.stringify(profile);
-      if (!canReplace()) return false;
       store.setItem(KEY, json);
-      expectedRaw = json;
       blocked = false; recoverable = false; lastGoodRaw = json; S.savedAt = profile.savedAt;
-      status('saved', 'Recovered progress saved. Original recovery copy retained.', false); mirrorNative(json);
+      status('saved', 'Recovered progress saved. Original recovery copy retained.', false);
       return true;
     } catch (e) { status('recovery', 'Recovery could not be saved. The original is still protected. Export before leaving.'); return false; }
   }
@@ -447,27 +328,23 @@
   // stored original are archived first; a failed step leaves active state intact.
   function importSave(raw) {
     clearTimeout(saveT);
-    if (!canReplace()) return false;
     try {
       const next = inspectImport(raw), store = storage();
       const existing = store.getItem(KEY);
       quarantine(existing);
       quarantine(JSON.stringify(snapshot()));
       const json = JSON.stringify(next);
-      if (!canReplace()) return false;
       store.setItem(KEY, json);
-      expectedRaw = json;
       emit({ type: 'beforeGameChange' });
       S = next; ensureProgress(S.artifact); originalRaw = existing;
       blocked = false; recoverable = false; lastGoodRaw = json;
-      status('saved', 'Imported save. Previous progress retained in recovery storage.', false); mirrorNative(json);
+      status('saved', 'Imported save. Previous progress retained in recovery storage.', false);
       emit({ type: 'import' });
       return true;
     } catch (e) { status(blocked ? persistence.code : 'unsaved', 'Import failed. Current progress was kept. Check the file or export before leaving.'); return false; }
   }
   function reset() {
     clearTimeout(saveT);
-    if (!canReplace()) return false;
     if (blocked) { status(persistence.code, 'Reset blocked while a save needs recovery. Export and resolve recovery first.'); return false; }
     try {
       const store = storage();
@@ -475,11 +352,9 @@
       quarantine(JSON.stringify(snapshot()));
       const next = fresh();
       next.progress[next.artifact] = { tier: 0, heat: 0, started: Date.now(), ember: 0, victories: 0 };
-      if (!canReplace()) return false;
       store.setItem(KEY, JSON.stringify(next));
-      expectedRaw = JSON.stringify(next);
       emit({ type: 'beforeGameChange' });
-      S = next; lastGoodRaw = JSON.stringify(next); status('saved', '', false); mirrorNative(expectedRaw); emit({ type: 'reset' });
+      S = next; lastGoodRaw = JSON.stringify(next); status('saved', '', false); emit({ type: 'reset' });
       return true;
     } catch (e) { status('unsaved', 'Reset could not be saved. Existing progress was kept. Export before leaving.'); return false; }
   }
@@ -514,7 +389,6 @@
 
   /* ---------- Ember ------------------------------------------------------- */
   function addEmber(n, reason) {
-    if (!editable()) return false;
     if (!n) return;
     S.embers += n; S.totalEmber += n;
     if (!S.firstArtifact) S.firstArtifact = S.artifact;
@@ -532,7 +406,6 @@
 
   /* Strike the forge: advance one tier. Returns a description of what happened. */
   function strike() {
-    if (!editable()) return null;
     const p = current(), def = ES.Artifacts.get(S.artifact);
     if (p.heat < cost()) return null;
     const from = p.tier;
@@ -559,7 +432,6 @@
   }
 
   function selectArtifact(id) {
-    if (!editable()) return false;
     const def = ES.Artifacts.get(id), count = Object.keys(S.completed).length;
     if (S.completed[id] || def.unlock > count) return false;
     S.artifact = id; ensureProgress(id); if (!S.firstArtifact) S.firstArtifact = id; save(); emit({ type: 'artifact' });
@@ -575,7 +447,6 @@
 
   /* ---------- games -------------------------------------------------------- */
   function startGame(game) {
-    if (!editable()) return false;
     if (game === S.game) return;
     prepareHand(game);
     emit({ type: 'beforeGameChange' });
@@ -588,7 +459,6 @@
     save(true);
   }
   function abandonGame() {
-    if (!editable()) return false;
     emit({ type: 'beforeGameChange' });
     if (S.game && !S.game.won && S.game.moves > 0) S.stats.streak = 0;
     S.game = null; save(true);
@@ -596,7 +466,6 @@
   /* Apply progression for an engine result. Returns {ember, daily, win} */
   function applyResult(g, res) {
     const out = { ember: 0 };
-    if (!editable()) return out;
     if (!res || !res.ok || g !== S.game || victoryInProgress) return out;
     prepareHand(g);
     const winning = !!res.won;
@@ -658,30 +527,12 @@
   function dailyFor(key) { return S.daily[key] || null; }
   function dailySeed(key) { return ES.Engine.seedFrom('ember-daily-' + key); }
 
-  // Optional notifications improve status latency; authority is the Web Lock,
-  // and every replacement still compares primary and backup while it is held.
-  if (typeof root.addEventListener === 'function') root.addEventListener('storage', event => {
-    if (event.key !== null && event.key !== KEY && event.key !== BACKUP_KEY) return;
-    if (writer && !conflict && loaded) canReplace(); else if (!writer) readOnlyStatus();
-  });
-  function restoreNative(raw) {
-    if (!canReplace() || blocked) return false;
-    try {
-      if (raw === expectedRaw) return true;
-      const next = inspectImport(raw);
-      if (next.savedAt < S.savedAt) return false;
-      return importSave(raw);
-    } catch (_) { return false; } // Unsupported candidates never replace the primary.
-  }
   ES.Store = {
     KEY, HEAT_PER_TIER, LEVEL_EMBER, WIN_REWARD, SET_REWARD, DAILY_REWARD, DAILY_GOAL_SETS, MODES,
     get state() { return S; }, get canRecover() { return recoverable; }, get persistence() { return Object.assign({}, persistence); }, load, save, on, emit, today,
     validateHand, validateProfile, recoveryCopies, exportRecovery, acceptRecovery, exportSave, exportOriginal, exportBackup, inspectImport, importSave, RECOVERY_PREFIX, BACKUP_KEY,
     current, heatPct, ready, cost, costFor, pctFor, levelProgress, addEmber, strike, selectArtifact, artifactState,
     startGame, abandonGame, applyResult, tick, favoriteSuits, dailyFor, dailySeed,
-    reset, acquireWriter, releaseWriter, resumeEditing, restoreNative, flushSave, nativeFailure,
-    get canEdit() { return editable(); }, get ownsWriter() { return writer; }, get ownership() { return ownership; },
-    exportStored() { return storage().getItem(KEY); },
-    get conflictMemory() { return conflictMemory; }, get conflictStored() { return conflictStored; }
+    reset
   };
 })(typeof window !== 'undefined' ? window : globalThis);

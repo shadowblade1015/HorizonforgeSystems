@@ -10,7 +10,6 @@
 
   /* ======================= GAME FLOW ===================================== */
   function newGame(suits, opts) {
-    if (!St().canEdit) { UI.saveRecovery(); return false; }
     opts = opts || {};
     const g = ES.Engine.newGame(suits, opts.daily ? { seed: St().dailySeed(opts.dailyKey), daily: true, dailyKey: opts.dailyKey } : {});
     g.run = 0;
@@ -433,7 +432,7 @@
         </div>
         <div class="panel set-group">
           ${nav('setTutorial', 'Replay Tutorial', '', 'hint')}
-          ${nav('setOffline', 'Game Updates', 'Updates and recovery', 'shield')}
+          ${nav('setOffline', 'Offline & Updates', 'Installation / artwork', 'shield')}
           ${nav('setSaveRecovery', 'Save Recovery', 'Export / import', 'shield')}
           ${nav('setReset', 'Reset Progress', '', 'restart')}
         </div>
@@ -446,10 +445,10 @@
     $('#setTables').onclick = () => chooser('Table Themes', M.tables, 'table', k => `<span class="tbl-swatch" style="background-image:url('${M.tables[k].src}')"></span>`);
     const pc = $('#setPrivacyChoices'); if (pc) pc.onclick = () => ES.Ads.showPrivacyOptions();
     $('#setPrivacy').onclick = () => ES.Platform.openUrl(ES.Build.privacyUrl);
-    $('#setAbout').onclick = () => UI.sheet({ kicker: 'A Horizon Forge Game', title: 'Ember Solitaire', body: `<img class="about-emblem" src="${M.branding.emblemSmall}" alt=""><p class="center small muted">Version ${ES.Build.version} (${ES.Build.versionCode})<br>Support: <a href="mailto:${esc(ES.Build.supportEmail)}">${esc(ES.Build.supportEmail)}</a><br>Classic Spider Solitaire inside an ancient forge.<br>Every hand feeds the flame.</p><p class="center small muted">Spider rules: build K, Q, J, 10 through A, one rank at a time. Any suit may receive a card. Mixed-suit stacks are temporary; only descending cards of one suit move together. A full K?A run clears only in one suit, never by color. A dashed right card edge marks a mixed-suit join. Solid hint outlines mark source cards; the dashed outline marks their destination.</p><p class="center small muted">Keyboard: ← → choose a column · Enter pick up / place · ↑ ↓ adjust run · D deal · U undo · H hint</p>` });
+    $('#setAbout').onclick = () => UI.sheet({ kicker: 'A Horizon Forge Game', title: 'Ember Solitaire', body: `<img class="about-emblem" src="${M.branding.emblemSmall}" alt=""><p class="center small muted">Version ${ES.Build.version} (${ES.Build.versionCode})<br>Support: <a href="mailto:${esc(ES.Build.supportEmail)}">${esc(ES.Build.supportEmail)}</a><br>Classic Spider Solitaire inside an ancient forge.<br>Every hand feeds the flame.</p><p class="center small muted">Keyboard: ← → choose a column · Enter pick up / place · ↑ ↓ adjust run · D deal · U undo · H hint</p>` });
     $('#setTutorial').onclick = () => { S().ftue.tutorial = false; St().save(); ES.Tutorial.start(); };
     $('#setSaveRecovery').onclick = UI.saveRecovery;
-    $('#setOffline').onclick = () => { if (ES.Offline) ES.Offline.check(); else UI.toast('Game updates are managed by your app store in native builds. Save Recovery remains available.'); };
+    $('#setOffline').onclick = () => { if (ES.Offline) ES.Offline.check(); else UI.toast('Build the site to enable offline installation.'); };
     $('#setReset').onclick = () => UI.sheet({ title: 'Reset Progress?', body: '<p class="center small muted">All Ember, artifacts, statistics and the hand in progress will be erased. Recovery copies will be kept on this device.</p>', actions: [{ label: 'Keep my progress', primary: true }, { label: 'Erase everything', ghost: true, onClick: () => { if (!St().reset()) { UI.saveRecovery(); return; } UI.applySettings(); UI.toast('Progress reset.'); UI.go('home'); } }] });
   };
   function chooser(title, map, key, thumb) {

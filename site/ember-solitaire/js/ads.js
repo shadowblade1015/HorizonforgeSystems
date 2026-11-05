@@ -13,7 +13,7 @@
    • No banners, no app-open ads.
    • Audience is 13+ (not child-directed): maxAdContentRating = Teen.
 
-   Web and native providers are disabled until separately reviewed.
+   Web builds: ads are off. `?ads=mock` simulates ads for UI tests.
    ========================================================================== */
 (function (root) {
   'use strict';
@@ -23,21 +23,21 @@
     canRequest: false, privacyRequired: false, consentStatus: 'UNKNOWN',
     loaded: { interstitial: false, rewarded: false }, showing: false
   };
+  const mock = /[?&]ads=mock/.test(root.location ? root.location.search : '');
   const C = () => ES.Config, log = (n, p) => ES.Analytics && ES.Analytics.log(n, p);
   const units = () => ES.Build.adsProduction ? ES.AdUnits.production : ES.AdUnits.test;
-  // Separate provider slots: web AdSense intentionally has no implementation.
-  ES.AdProviders = Object.freeze({ web: null, native: () => ES.Platform.plugin('AdMob') });
-  const plug = () => ES.Platform.native ? ES.AdProviders.native() : ES.AdProviders.web;
+  const plug = () => ES.Platform.plugin('AdMob');
   const st = () => { const s = ES.Store.state.ads; const d = ES.Store.today(); if (s.day !== d) { s.day = d; s.rewardsToday = 0; } return s; };
 
   /* ---------- startup: consent → init → preload --------------------------- */
   async function init() {
-    if (ES.Build.adsEnabled !== true || !ES.Platform.native || !C().bool('ads_enabled')) { A.status = 'off'; return A; }
+    if (mock) { A.status = 'ready'; A.canRequest = true; A.loaded.interstitial = A.loaded.rewarded = true; return A; }
+    if (!ES.Platform.native || !C().bool('ads_enabled')) { A.status = 'off'; return A; }
     const P = plug(); if (!P) { A.status = 'off'; return A; }
     A.status = 'consenting';
     try {
       const req = { tagForUnderAgeOfConsent: false };
-      // Internal test builds can force the EEA consent flow on registered test devices (a separately reviewed development build).
+      // Internal test builds can force the EEA consent flow on registered test devices (tools/build_www.js --ump-eea).
       if (!ES.Build.adsProduction && ES.Build.umpDebugEEA) { req.debugGeography = 1; req.testDeviceIdentifiers = ES.Build.testDevices || []; }
       let info = await P.requestConsentInfo(req);
       if (info && !info.canRequestAds && info.status === 'REQUIRED' && info.isConsentFormAvailable) {
@@ -76,6 +76,7 @@
   const backoff = { interstitial: 0, rewarded: 0 };
   function retry(fmt) { backoff[fmt] = Math.min(6, backoff[fmt] + 1); setTimeout(() => preload(fmt), 2000 * Math.pow(2, backoff[fmt])); }
   async function preload(fmt) {
+    if (mock) { A.loaded[fmt] = true; return; }
     if (A.status !== 'ready' || A.loaded[fmt]) return;
     const P = plug(); if (!P) return;
     const opts = { adId: units()[fmt], isTesting: !ES.Build.adsProduction, immersiveMode: true };
@@ -98,7 +99,8 @@
     A.showing = true; ES.Audio.suspend(true);
     let granted = false;
     try {
-      {
+      if (mock) granted = await mockAd('Rewarded test ad', true);
+      else {
         const P = plug(), subs = [];
         granted = await new Promise(resolve => {
           let got = false; const done = () => { subs.forEach(s => s && s.then && s.then(h => h.remove()).catch(() => {})); resolve(got); };
@@ -138,7 +140,8 @@
     const s = st();
     A.showing = true; ES.Audio.suspend(true);
     try {
-      {
+      if (mock) await mockAd('Interstitial test ad', false);
+      else {
         const P = plug(), subs = [];
         await new Promise(resolve => {
           const done = () => { subs.forEach(x => x && x.then && x.then(h => h.remove()).catch(() => {})); resolve(); };
@@ -155,8 +158,9 @@
   }
 
   /* ---------- privacy options (Settings) ----------------------------------- */
-  function privacyOptionsAvailable() { return ES.Platform.native && A.privacyRequired; }
+  function privacyOptionsAvailable() { return mock || (ES.Platform.native && A.privacyRequired); }
   async function showPrivacyOptions() {
+    if (mock) { ES.UI.toast('Privacy options (test mode)'); return; }
     const P = plug(); if (!P) return;
     try {
       const info = await P.showPrivacyOptionsForm();
@@ -164,6 +168,17 @@
     } catch (e) { ES.Analytics.nonFatal(e, 'privacy_options'); }
   }
   function onResume() { if (A.status === 'ready') { preload('rewarded'); preload('interstitial'); } }
+
+  /* ---------- test double -------------------------------------------------- */
+  function mockAd(label, rewarded) {
+    return new Promise(resolve => {
+      const el = document.createElement('div');
+      el.className = 'mock-ad'; el.setAttribute('role', 'dialog'); el.setAttribute('aria-label', label);
+      el.innerHTML = `<div class="mock-ad-box"><b>${label}</b><span>Shown only in ?ads=mock test builds.</span><button class="btn" id="mockAdClose">${rewarded ? 'Finish ad' : 'Close ad'}</button></div>`;
+      document.body.appendChild(el);
+      el.querySelector('#mockAdClose').onclick = () => { el.remove(); resolve(true); };
+    });
+  }
 
   ES.Ads = { init, state: A, rewardedAvailable, rewardAmount, showRewarded, offer, gameFinished, interstitialEligible, maybeInterstitial, privacyOptionsAvailable, showPrivacyOptions, onResume };
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -1,6 +1,6 @@
 /* ==========================================================================
    EMBER SOLITAIRE — Release + tunable configuration
-   `ES.Build` is written by tools/build-native.mjs for native builds (web builds use
+   `ES.Build` is written by tools/build_www.js for native builds (web builds use
    the defaults below). `ES.Config` holds every value Remote Config may override.
    ========================================================================== */
 (function (root) {
@@ -10,18 +10,17 @@
   ES.Build = Object.assign({
     version: '2.1.0',
     versionCode: 21,
-    adsEnabled: false,
     native: false,            // true inside the Android app
     firebase: false,          // true only when google-services.json was present at build time
     adsProduction: false,     // false = Google test ad units (safe for development)
-    privacyUrl: 'https://horizonforgesystems.com/ember-solitaire/privacy.html',   // compiled build setting
+    privacyUrl: 'https://horizonforgesystems.com/ember-solitaire/privacy.html',   // set in release.config.json
     supportEmail: 'support@horizonforgesystems.com'                         // set in release.config.json
   }, root.ES_BUILD || {});
 
   /* Ad units. Test IDs are Google's public sample units and never earn revenue.
      Replace the production values with your AdMob units (AdMob → Apps → Ad units). */
   ES.AdUnits = {
-    // production units remain empty; enabling a provider requires separate review
+    // production units are injected from release.config.json by tools/build_www.js --production
     test: {
       interstitial: 'ca-app-pub-3940256099942544/1033173712',
       rewarded: 'ca-app-pub-3940256099942544/5224354917'
@@ -31,7 +30,7 @@
 
   /* Remote Config keys (Firebase console → Remote Config). Defaults ship in the app. */
   const DEFAULTS = {
-    ads_enabled: false,
+    ads_enabled: true,
     interstitial_enabled: true,
     interstitial_every_n_games: 3,         // finished games between interstitials
     interstitial_min_interval_sec: 240,    // and at least this long since the last one

@@ -20,8 +20,8 @@
   'use strict';
   const ES = root.ES = root.ES || {};
   const ring = [];
-  let consentAnalytics = false;
-  const enabled = () => false; // Reserved for a separately reviewed diagnostics provider.
+  let consentAnalytics = true;
+  const enabled = () => ES.Build.native && ES.Build.firebase;
   const sessionStart = Date.now();
 
   function clean(params) {
@@ -57,7 +57,7 @@
   async function applyConsent(c) {
     const adsOk = !!(c && c.canRequestAds);
     const needed = c && c.status === 'REQUIRED';
-    consentAnalytics = false;
+    consentAnalytics = !needed || adsOk;
     if (!enabled()) return;
     const G = 'GRANTED', D = 'DENIED';
     const set = (type, ok) => ES.Platform.call('FirebaseAnalytics', 'setConsent', { type, status: ok ? G : D });

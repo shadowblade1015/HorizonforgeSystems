@@ -7,9 +7,8 @@
   const UI = ES.UI, St = ES.Store, M = ES.Manifest;
 
   async function boot() {
-    await St.acquireWriter();
+    try { await ES.Platform.hydrate(St.KEY); } catch (e) {}
     St.load();
-    try { if (St.ownsWriter && ES.Platform.native) await ES.Platform.hydrate(St.KEY); } catch (e) {}
     UI.mountSaveStatus();
     ES.Platform.init();
     UI.applySettings();
@@ -35,7 +34,7 @@
     document.addEventListener('pointerdown', () => ES.Audio.unlock(), { once: true, capture: true });
     document.addEventListener('keydown', () => ES.Audio.unlock(), { once: true, capture: true });
     document.addEventListener('visibilitychange', () => { if (document.hidden) St.save(true); });
-    root.addEventListener('pagehide', () => { if (ES.Platform.native) void St.flushSave().finally(() => St.releaseWriter()); else { St.save(true); St.releaseWriter(); } });
+    root.addEventListener('pagehide', () => St.save(true));
 
     // critical preload: branding, current table/back, current environment, current suits
     const s = St.state.settings;

@@ -1,4 +1,3 @@
-> Current playable-baseline scope (November 3, 2026): web gameplay is online-first. PWA installation, all-mode offline availability and artwork downloads are not product requirements. The certified worker and tests below are retained as legacy-client compatibility evidence. Settings now contains Game Updates and Save Recovery; no routine gameplay banner or artwork-download control remains. Native packages bundle their assets separately. See [playable baseline](EMBER_PLAYABLE_BASELINE_REPORT.md) and [native readiness](EMBER_NATIVE_RELEASE_READINESS.md).
 # Offline and release validation matrix
 
 October 25, 2026. Phase 3F. Automated browser: Windows headless Chrome 155.0.8059.86, isolated profile, single loopback origin with deployment switching. All 41 assertions pass. Full implementation, evidence and release/rollback procedure: [PHASE_3F_REPORT.md](PHASE_3F_REPORT.md).

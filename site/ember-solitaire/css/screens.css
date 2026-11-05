@@ -406,6 +406,8 @@
 .victory .stoke { margin-top: 0; }
 
 /* test double for ads (?ads=mock only) */
+.mock-ad { position: fixed; inset: 0; z-index: 200; display: grid; place-items: center; background: #1d2a3a; color: #fff; font-family: var(--font-ui); }
+.mock-ad-box { display: grid; gap: 12px; text-align: center; padding: 24px; }
 
 /* Ceremony actions remain reachable on short viewports and enlarged text. */
 .tf-title { max-height: 65dvh; overflow-y: auto; overscroll-behavior: contain; }
